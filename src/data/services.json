@@ -1,0 +1,148 @@
+{
+  "company": {
+    "name": "简跃科技",
+    "nameEn": "NextLeap Business",
+    "website": "",
+    "description": "帮助中国DTC品牌出海的全案营销公司"
+  },
+  "categories": [
+    {
+      "id": "full-package",
+      "name": "A类全案服务包",
+      "description": "从0到1启动海外市场",
+      "services": [
+        {
+          "id": "website-basic",
+          "name": "网站建设基础版",
+          "price": "$2,200 USD",
+          "priceCNY": "约¥15,000",
+          "period": "一次性",
+          "includes": [
+            "Shopify/WordPress官网搭建",
+            "首页结构规划",
+            "Homepage Desktop设计",
+            "后台搭建配置",
+            "基础插件配置（≤5个）",
+            "域名和上线支持"
+          ],
+          "excludes": [
+            "Mobile深度定制设计",
+            "大量产品上传",
+            "复杂功能开发",
+            "第三方插件费用"
+          ],
+          "bestFor": "刚起步验证市场的品牌"
+        },
+        {
+          "id": "website-monthly",
+          "name": "网站月度运营",
+          "price": "$3,000/月",
+          "priceCNY": "约¥21,600/月",
+          "period": "持续",
+          "includes": [
+            "每月30小时执行",
+            "首页/产品页内容优化",
+            "Banner和促销模块制作",
+            "CTA按钮文案和转化路径优化",
+            "产品卖点、参数和FAQ表达优化",
+            "日常Bug修复、链接问题、显示错位",
+            "基础插件配置调整",
+            "基础速度优化"
+          ],
+          "bestFor": "需要持续优化官网的品牌"
+        },
+        {
+          "id": "seo-geo",
+          "name": "SEO/GEO基础服务包",
+          "price": "$2,500/月",
+          "priceCNY": "约¥18,000/月",
+          "period": "12个月",
+          "includes": [
+            "10-20个核心关键词持续布局",
+            "每月4篇内容（AI初稿+人工优化）",
+            "每季度更新关键词策略",
+            "持续优化内链结构",
+            "持续更新FAQ和结构化内容",
+            "GEO布局（AI搜索优化）",
+            "Google Search Console和GA配置"
+          ],
+          "bestFor": "希望建立长期自然流量的品牌"
+        },
+        {
+          "id": "ads-startup",
+          "name": "广告投放启动",
+          "price": "服务费：广告消耗×5-12%",
+          "priceCNY": "广告预算建议¥10,000/月起",
+          "period": "持续",
+          "includes": [
+            "根据产品判断先做Google还是Meta",
+            "搭建基础广告账户结构",
+            "搭建1-2个基础Campaign",
+            "设置基础关键词或受众测试方向",
+            "检查GA/Pixel/基础转化事件追踪",
+            "给出广告图文、卖点和落地页建议",
+            "每周优化2-3次",
+            "每月输出投放表现报告和下一步建议"
+          ],
+          "bestFor": "需要快速获取流量的品牌"
+        },
+        {
+          "id": "email-setup",
+          "name": "邮件营销搭建",
+          "price": "一次性+持续优化",
+          "priceCNY": "",
+          "period": "持续",
+          "includes": [
+            "Klaviyo账号基础配置",
+            "Welcome Flow（新用户订阅后自动触达）",
+            "Abandoned Cart（加购未购买自动提醒）",
+            "Browse Abandonment（浏览产品后自动触达）",
+            "基础邮件模板设计",
+            "订阅表单接入网站",
+            "查看打开率、点击率、转化基础数据"
+          ],
+          "bestFor": "希望留住流量、提升复购的品牌"
+        }
+      ]
+    },
+    {
+      "id": "single-service",
+      "name": "B类单项服务包",
+      "description": "已有官网或部分海外业务的客户",
+      "services": [
+        {
+          "id": "website-b",
+          "name": "网站建设B（标准版）",
+          "price": "$8,000 USD",
+          "priceCNY": "约¥55,000",
+          "period": "一次性",
+          "bestFor": "需要升级官网的品牌"
+        },
+        {
+          "id": "website-c",
+          "name": "网站建设C（高级版）",
+          "price": "$18,000 USD",
+          "priceCNY": "约¥128,000",
+          "period": "一次性",
+          "bestFor": "需要品牌官网定制的品牌"
+        },
+        {
+          "id": "seo-geo-b",
+          "name": "SEO/GEO服务包B",
+          "price": "$2,500/月",
+          "priceCNY": "约¥18,000/月",
+          "period": "持续",
+          "bestFor": "已有官网，需要SEO优化"
+        },
+        {
+          "id": "ads-b",
+          "name": "广告投放管理B",
+          "price": "广告消耗×8%",
+          "priceCNY": "",
+          "period": "持续",
+          "bestFor": "已有广告账户，需要专业管理"
+        }
+      ]
+    }
+  ]
+}
