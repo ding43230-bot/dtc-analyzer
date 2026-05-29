@@ -84,9 +84,11 @@ H2(${h2s.length}): ${h2s.join(' | ') || '无'}
 `.trim();
 }
 
+const WORKER_URL = 'https://mimo-proxy.ding43230.workers.dev';
+
 async function callProxy(messages: Array<{role: string; content: string}>): Promise<string> {
   try {
-    const res = await fetch('/api/proxy', {
+    const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages, temperature: 0.2, max_tokens: 2500 }),
