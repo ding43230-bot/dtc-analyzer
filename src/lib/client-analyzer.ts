@@ -86,19 +86,31 @@ H2(${h2s.length}): ${h2s.join(' | ') || '无'}
 
 async function callProxy(messages: Array<{role: string; content: string}>): Promise<string> {
   try {
-    const res = await fetch('/api/proxy', {
+    const apiBase = process.env.NEXT_PUBLIC_MIMO_API_BASE;
+    const apiKey = process.env.NEXT_PUBLIC_MIMO_API_KEY;
+    const model = process.env.NEXT_PUBLIC_MIMO_MODEL || 'mimo-v2.5-pro';
+
+    const res = await fetch(`${apiBase}/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, temperature: 0.2, max_tokens: 2500 }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.2,
+        max_tokens: 2500,
+      }),
     });
-    const data = await res.json();
-    if (data.error) {
-      console.error('Proxy error:', data.error, data);
+    if (!res.ok) {
+      console.error('MiMo API error:', res.status);
       return '';
     }
+    const data = await res.json();
     return data.choices?.[0]?.message?.content || '';
   } catch (e: any) {
-    console.error('Proxy call failed:', e?.message);
+    console.error('API call failed:', e?.message);
     return '';
   }
 }
