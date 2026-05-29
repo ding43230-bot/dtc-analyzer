@@ -43,11 +43,17 @@ export default function Home() {
 
       setProgress('正在生成分析报告...');
 
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        setError(`服务器错误 (${response.status}): ${text.substring(0, 100)}`);
+        setLoading(false);
+        return;
+      }
+
       const data = await response.json();
 
       if (data.success) {
         if (data.cached) setProgress('使用缓存结果...');
-        // Store report data in localStorage for Vercel serverless
         try {
           const reportKey = `report_${data.reportId}`;
           localStorage.setItem(reportKey, JSON.stringify({
@@ -64,8 +70,8 @@ export default function Home() {
         setError(data.error || '分析失败，请重试');
         setLoading(false);
       }
-    } catch {
-      setError('网络错误，请重试');
+    } catch (err: any) {
+      setError(`网络错误: ${err?.message || '请检查网络后重试'}`);
       setLoading(false);
     }
   };
