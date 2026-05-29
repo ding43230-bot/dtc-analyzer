@@ -1,10 +1,17 @@
 import OpenAI from 'openai';
 import { ScrapedData } from './scraper';
 
-const client = new OpenAI({
-  apiKey: process.env.MIMO_API_KEY,
-  baseURL: process.env.MIMO_API_BASE,
-});
+let _client: OpenAI | null = null;
+
+function getClient(): OpenAI {
+  if (!_client) {
+    _client = new OpenAI({
+      apiKey: process.env.MIMO_API_KEY,
+      baseURL: process.env.MIMO_API_BASE,
+    });
+  }
+  return _client;
+}
 
 const MODEL = process.env.MIMO_MODEL || 'mimo-v2.5-pro';
 
@@ -129,7 +136,7 @@ async function callAI(systemPrompt: string, userPrompt: string): Promise<string>
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const response = await client.chat.completions.create({
+      const response = await getClient().chat.completions.create({
         model: MODEL,
         messages: [
           { role: 'system', content: systemPrompt },
