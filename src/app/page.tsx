@@ -35,11 +35,17 @@ export default function Home() {
     setProgress('正在爬取网站数据...');
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 25000);
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: normalizedUrl }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeout);
 
       setProgress('正在生成分析报告...');
 
@@ -71,7 +77,11 @@ export default function Home() {
         setLoading(false);
       }
     } catch (err: any) {
-      setError(`网络错误: ${err?.message || '请检查网络后重试'}`);
+      if (err?.name === 'AbortError') {
+        setError('分析超时，请稍后重试（网站可能响应较慢）');
+      } else {
+        setError(`网络错误: ${err?.message || '请检查网络后重试'}`);
+      }
       setLoading(false);
     }
   };

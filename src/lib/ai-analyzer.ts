@@ -132,7 +132,7 @@ ${forms.map((f, i) => `表单${i + 1}: inputs=[${(f.inputs || []).join(', ')}]`)
 }
 
 async function callAI(systemPrompt: string, userPrompt: string): Promise<string> {
-  const maxRetries = 2;
+  const maxRetries = 1;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {

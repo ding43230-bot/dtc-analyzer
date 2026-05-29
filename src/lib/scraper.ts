@@ -30,7 +30,7 @@ export async function scrapeWebsite(url: string): Promise<ScrapedData> {
       'Accept-Language': 'en-US,en;q=0.9,zh-CN;q=0.8',
     },
     redirect: 'follow',
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(8000),
   });
 
   if (!response.ok) {
