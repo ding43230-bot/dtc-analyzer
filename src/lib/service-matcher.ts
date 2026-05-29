@@ -1,4 +1,4 @@
-import { AnalysisResult } from './analyzer';
+import { AnalysisResult } from './types';
 import servicesData from '@/data/services.json';
 
 export interface ServiceRecommendation {

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { runClientAnalysis } from '@/lib/client-analyzer';
+import { matchServices } from '@/lib/service-matcher';
 
 export default function Home() {
   const [url, setUrl] = useState('');
@@ -56,42 +58,44 @@ export default function Home() {
         return;
       }
 
-      // Step 2: AI Analysis
-      setProgress('正在AI深度分析（4个专家并行）...');
+      // Step 2: Client-side AI Analysis (no server timeout)
+      setProgress('正在AI深度分析（UI/UX专家）...');
 
-      const aiRes = await fetch('/api/ai-analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: normalizedUrl, scrapedData: scrapeData.data }),
-      });
+      const aiResult = await runClientAnalysis(scrapeData.data);
 
-      if (!aiRes.ok) {
-        const text = await aiRes.text().catch(() => '');
-        setError(`AI分析失败 (${aiRes.status}): ${text.substring(0, 100)}`);
-        setLoading(false);
-        return;
-      }
+      setProgress('正在匹配服务推荐...');
 
-      const data = await aiRes.json();
+      const analysisForMatching = {
+        url: normalizedUrl,
+        timestamp: new Date().toISOString(),
+        scores: aiResult.scores,
+        uiux: { score: aiResult.uiux.score, issues: aiResult.uiux.issues } as any,
+        seo: { score: aiResult.seo.score, issues: aiResult.seo.issues } as any,
+        ads: { score: aiResult.ads.score, issues: aiResult.ads.issues } as any,
+        email: { score: aiResult.email.score, issues: aiResult.email.issues } as any,
+        recommendations: [] as string[],
+      };
+      const recommendations = matchServices(analysisForMatching);
 
-      if (data.success) {
-        if (data.cached) setProgress('使用缓存结果...');
-        try {
-          const reportKey = `report_${data.reportId}`;
-          localStorage.setItem(reportKey, JSON.stringify({
-            id: data.reportId,
-            url: normalizedUrl,
-            timestamp: new Date().toISOString(),
-            scores: data.analysis?.scores || {},
-            recommendations: data.recommendations || [],
-            analysis: data.analysis || {},
-          }));
-        } catch {}
-        router.push(data.reportUrl);
-      } else {
-        setError(data.error || '分析失败，请重试');
-        setLoading(false);
-      }
+      const reportId = `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+      try {
+        localStorage.setItem(`report_${reportId}`, JSON.stringify({
+          id: reportId,
+          url: normalizedUrl,
+          timestamp: new Date().toISOString(),
+          scores: aiResult.scores,
+          recommendations,
+          analysis: {
+            uiux: { score: aiResult.uiux.score, summary: aiResult.uiux.summary, checks: aiResult.uiux.checks, issues: aiResult.uiux.issues, suggestions: aiResult.uiux.suggestions },
+            seo: { score: aiResult.seo.score, summary: aiResult.seo.summary, checks: aiResult.seo.checks, issues: aiResult.seo.issues, suggestions: aiResult.seo.suggestions },
+            ads: { score: aiResult.ads.score, summary: aiResult.ads.summary, checks: aiResult.ads.checks, issues: aiResult.ads.issues, suggestions: aiResult.ads.suggestions },
+            email: { score: aiResult.email.score, summary: aiResult.email.summary, checks: aiResult.email.checks, issues: aiResult.email.issues, suggestions: aiResult.email.suggestions },
+          },
+        }));
+      } catch {}
+
+      router.push(`/report/${reportId}`);
     } catch (err: any) {
       setError(`网络错误: ${err?.message || '请检查网络后重试'}`);
       setLoading(false);
