@@ -35,28 +35,44 @@ export default function Home() {
     setProgress('正在爬取网站数据...');
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 25000);
-
-      const response = await fetch('/api/analyze', {
+      // Step 1: Scrape
+      const scrapeRes = await fetch('/api/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: normalizedUrl }),
-        signal: controller.signal,
       });
 
-      clearTimeout(timeout);
-
-      setProgress('正在生成分析报告...');
-
-      if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        setError(`服务器错误 (${response.status}): ${text.substring(0, 100)}`);
+      if (!scrapeRes.ok) {
+        const text = await scrapeRes.text().catch(() => '');
+        setError(`爬取失败 (${scrapeRes.status}): ${text.substring(0, 100)}`);
         setLoading(false);
         return;
       }
 
-      const data = await response.json();
+      const scrapeData = await scrapeRes.json();
+      if (!scrapeData.success) {
+        setError(scrapeData.error || '网站爬取失败');
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: AI Analysis
+      setProgress('正在AI深度分析（4个专家并行）...');
+
+      const aiRes = await fetch('/api/ai-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: normalizedUrl, scrapedData: scrapeData.data }),
+      });
+
+      if (!aiRes.ok) {
+        const text = await aiRes.text().catch(() => '');
+        setError(`AI分析失败 (${aiRes.status}): ${text.substring(0, 100)}`);
+        setLoading(false);
+        return;
+      }
+
+      const data = await aiRes.json();
 
       if (data.success) {
         if (data.cached) setProgress('使用缓存结果...');
@@ -77,11 +93,7 @@ export default function Home() {
         setLoading(false);
       }
     } catch (err: any) {
-      if (err?.name === 'AbortError') {
-        setError('分析超时，请稍后重试（网站可能响应较慢）');
-      } else {
-        setError(`网络错误: ${err?.message || '请检查网络后重试'}`);
-      }
+      setError(`网络错误: ${err?.message || '请检查网络后重试'}`);
       setLoading(false);
     }
   };
