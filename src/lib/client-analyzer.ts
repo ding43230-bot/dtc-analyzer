@@ -84,19 +84,21 @@ H2(${h2s.length}): ${h2s.join(' | ') || '无'}
 `.trim();
 }
 
-const WORKER_URL = 'https://mimo-proxy.ding43230.workers.dev';
-
 async function callProxy(messages: Array<{role: string; content: string}>): Promise<string> {
   try {
-    const res = await fetch(WORKER_URL, {
+    const res = await fetch('/api/proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages, temperature: 0.2, max_tokens: 2500 }),
     });
-    if (!res.ok) return '';
     const data = await res.json();
+    if (data.error) {
+      console.error('Proxy error:', data.error, data);
+      return '';
+    }
     return data.choices?.[0]?.message?.content || '';
-  } catch {
+  } catch (e: any) {
+    console.error('Proxy call failed:', e?.message);
     return '';
   }
 }

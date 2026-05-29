@@ -9,32 +9,42 @@ export async function POST(request: NextRequest) {
     const model = process.env.MIMO_MODEL || 'mimo-v2.5-pro';
 
     if (!apiBase || !apiKey) {
-      return NextResponse.json({ error: 'API not configured' }, { status: 500 });
+      return NextResponse.json({ error: 'API not configured', hasBase: !!apiBase, hasKey: !!apiKey }, { status: 500 });
     }
 
-    const response = await fetch(`${apiBase}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature,
-        max_tokens,
-      }),
-      signal: AbortSignal.timeout(9000),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    let response: Response;
+    try {
+      response = await fetch(`${apiBase}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature,
+          max_tokens,
+        }),
+        signal: controller.signal,
+      });
+    } catch (fetchErr: any) {
+      clearTimeout(timeout);
+      return NextResponse.json({ error: `Fetch failed: ${fetchErr?.message}`, code: fetchErr?.code }, { status: 502 });
+    }
+    clearTimeout(timeout);
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      return NextResponse.json({ error: `MiMo API error: ${response.status}`, detail: text }, { status: 502 });
+      return NextResponse.json({ error: `MiMo API ${response.status}`, body: text.substring(0, 500) }, { status: 502 });
     }
 
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Proxy error' }, { status: 500 });
+    return NextResponse.json({ error: error?.message, stack: error?.stack?.substring(0, 200) }, { status: 500 });
   }
 }
