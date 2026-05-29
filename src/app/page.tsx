@@ -47,6 +47,18 @@ export default function Home() {
 
       if (data.success) {
         if (data.cached) setProgress('使用缓存结果...');
+        // Store report data in localStorage for Vercel serverless
+        try {
+          const reportKey = `report_${data.reportId}`;
+          localStorage.setItem(reportKey, JSON.stringify({
+            id: data.reportId,
+            url: normalizedUrl,
+            timestamp: new Date().toISOString(),
+            scores: data.analysis?.scores || {},
+            recommendations: data.recommendations || [],
+            analysis: data.analysis || {},
+          }));
+        } catch {}
         router.push(data.reportUrl);
       } else {
         setError(data.error || '分析失败，请重试');

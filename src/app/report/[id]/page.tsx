@@ -284,6 +284,17 @@ export default function ReportPage() {
   useEffect(() => {
     const fetchReport = async () => {
       try {
+        // Try localStorage first (for Vercel serverless)
+        try {
+          const stored = localStorage.getItem(`report_${params.id}`);
+          if (stored) {
+            setReport(JSON.parse(stored));
+            setLoading(false);
+            return;
+          }
+        } catch {}
+
+        // Fallback to API
         const response = await fetch(`/api/report/${params.id}`);
         const data = await response.json();
         if (data.success) {
