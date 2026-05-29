@@ -66,6 +66,8 @@ export async function POST(request: NextRequest) {
     // Step 3: Match services
     console.log('Matching services...');
     const analysisForMatching = {
+      url,
+      timestamp: new Date().toISOString(),
       scores: aiAnalysis.scores,
       uiux: { score: aiAnalysis.uiux.score, issues: aiAnalysis.uiux.issues } as any,
       seo: { score: aiAnalysis.seo.score, issues: aiAnalysis.seo.issues } as any,
