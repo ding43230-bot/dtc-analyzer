@@ -21,6 +21,11 @@ interface AICheckItem {
   score: number;
   feedback: string;
   suggestion: string;
+  evidence?: {
+    pageUrl: string;
+    location: string;
+    region?: { x: number; y: number; width: number; height: number };
+  };
 }
 
 export interface AICategoryResult {
@@ -80,6 +85,8 @@ H2(${h2s.length}): ${h2s.join(' | ') || '无'}
 图片: ${images.length}张(无alt: ${imagesWithoutAlt}张)
 内部链接: ${internalLinks.length}个, 外部链接: ${externalLinks.length}个
 表单: ${forms.length}个, 邮箱输入: ${emailInputs ? '有' : '无'}
+主要链接(前10): ${links.slice(0, 10).map(l => `${l.text || '(无文字)'} -> ${l.href}`).join('\n  ')}
+主要图片(前5): ${images.slice(0, 5).map(i => `src=${i.src}, alt=${i.alt || '(无alt)'}`).join('\n  ')}
 内容(前1500字): ${data.content.substring(0, 1500)}
 `.trim();
 }
@@ -100,7 +107,7 @@ async function callProxy(messages: Array<{role: string; content: string}>): Prom
         model,
         messages,
         temperature: 0.2,
-        max_tokens: 2500,
+        max_tokens: 3500,
       }),
     });
     if (!res.ok) {
@@ -146,8 +153,24 @@ function parseAIResponse(raw: string): AICategoryResult {
       score: Math.min(100, Math.max(0, parsed.score || 0)),
       summary: parsed.summary || '',
       checks: (parsed.checks || []).map((c: any) => ({
-        label: c.label || '', score: Math.min(100, Math.max(0, c.score || 0)),
-        feedback: c.feedback || '', suggestion: c.suggestion || '',
+        label: c.label || '',
+        score: Math.min(100, Math.max(0, c.score || 0)),
+        feedback: c.feedback || '',
+        suggestion: c.suggestion || '',
+        ...(c.evidence ? {
+          evidence: {
+            pageUrl: c.evidence.pageUrl || '',
+            location: c.evidence.location || '',
+            ...(c.evidence.region ? {
+              region: {
+                x: Number(c.evidence.region.x) || 0,
+                y: Number(c.evidence.region.y) || 0,
+                width: Number(c.evidence.region.width) || 30,
+                height: Number(c.evidence.region.height) || 20,
+              }
+            } : {}),
+          }
+        } : {}),
       })),
       issues: parsed.issues || [],
       suggestions: parsed.suggestions || [],
@@ -156,6 +179,8 @@ function parseAIResponse(raw: string): AICategoryResult {
     return { score: 50, summary: '分析结果解析失败', checks: [], issues: ['无法解析AI分析结果'], suggestions: [] };
   }
 }
+
+const EVIDENCE_INSTRUCTION = `证据要求：每个checks项必须包含evidence字段，指向该问题的具体位置。pageUrl使用爬取数据中的实际链接（如"主要链接"中列出的URL），location用中文描述问题所在位置（如"首屏CTA按钮"、"页脚订阅表单"、"导航菜单"）。region是可选的截图区域坐标（百分比x/y/width/height），用于在截图上标出问题位置。如果某个检查项是关于缺失元素（如"缺少xxx"），则pageUrl使用首页URL，location描述应该在哪里找到该元素。`;
 
 async function analyzeCategory(systemPrompt: string, userPrompt: string): Promise<AICategoryResult> {
   const raw = await callProxy([
@@ -170,20 +195,20 @@ export async function runClientAnalysis(data: ScrapedData): Promise<FullAIAnalys
 
   const [uiux, seo, ads, email] = await Promise.all([
     analyzeCategory(
-      `你是资深UI/UX设计总监。分析要深入、专业、可执行。${SCORING_RUBRIC}`,
-      `对以下DTC品牌网站进行UI/UX深度诊断：\n\n${summary}\n\n分析：首屏设计、视觉层级、导航体验、响应式设计、加载性能、CTA设计、表单体验、信任设计。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":""}],"issues":[],"suggestions":[]}。checks必须8项。`
+      `你是资深UI/UX设计总监。分析要深入、专业、可执行。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
+      `对以下DTC品牌网站进行UI/UX深度诊断：\n\n${summary}\n\n分析：首屏设计、视觉层级、导航体验、响应式设计、加载性能、CTA设计、表单体验、信任设计。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","region":{"x":0,"y":0,"width":30,"height":20}}}],"issues":[],"suggestions":[]}。checks必须8项。`
     ),
     analyzeCategory(
-      `你是资深SEO总监。分析要基于数据，给出具体技术建议。${SCORING_RUBRIC}`,
-      `对以下DTC品牌网站进行SEO/GEO深度诊断：\n\n${summary}\n\n分析：Meta标签、标题层级、内容质量、结构化数据、图片SEO、内部链接、GEO优化、移动端SEO。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":""}],"issues":[],"suggestions":[]}。checks必须8项。`
+      `你是资深SEO总监。分析要基于数据，给出具体技术建议。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
+      `对以下DTC品牌网站进行SEO/GEO深度诊断：\n\n${summary}\n\n分析：Meta标签、标题层级、内容质量、结构化数据、图片SEO、内部链接、GEO优化、移动端SEO。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","region":{"x":0,"y":0,"width":30,"height":20}}}],"issues":[],"suggestions":[]}。checks必须8项。`
     ),
     analyzeCategory(
-      `你是资深广告转化优化总监。分析要基于CRO最佳实践。${SCORING_RUBRIC}`,
-      `对以下DTC品牌网站进行广告转化深度诊断：\n\n${summary}\n\n分析：价值主张、CTA设计、信任元素、社会证明、产品展示、转化路径、定价策略、结账体验。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":""}],"issues":[],"suggestions":[]}。checks必须8项。`
+      `你是资深广告转化优化总监。分析要基于CRO最佳实践。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
+      `对以下DTC品牌网站进行广告转化深度诊断：\n\n${summary}\n\n分析：价值主张、CTA设计、信任元素、社会证明、产品展示、转化路径、定价策略、结账体验。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","region":{"x":0,"y":0,"width":30,"height":20}}}],"issues":[],"suggestions":[]}。checks必须8项。`
     ),
     analyzeCategory(
-      `你是资深邮件营销总监。分析要基于DTC邮件营销最佳实践。${SCORING_RUBRIC}`,
-      `对以下DTC品牌网站进行邮件营销深度诊断：\n\n${summary}\n\n分析：邮箱捕获入口、订阅激励、线索捕获机制、邮件自动化、个性化能力、合规性、多渠道协同、生命周期营销。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":""}],"issues":[],"suggestions":[]}。checks必须6-8项。`
+      `你是资深邮件营销总监。分析要基于DTC邮件营销最佳实践。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
+      `对以下DTC品牌网站进行邮件营销深度诊断：\n\n${summary}\n\n分析：邮箱捕获入口、订阅激励、线索捕获机制、邮件自动化、个性化能力、合规性、多渠道协同、生命周期营销。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","region":{"x":0,"y":0,"width":30,"height":20}}}],"issues":[],"suggestions":[]}。checks必须6-8项。`
     ),
   ]);
 

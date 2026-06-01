@@ -69,6 +69,11 @@ interface CheckItem {
   feedback: string;
   suggestion?: string;
   status: 'pass' | 'warn' | 'fail';
+  evidence?: {
+    pageUrl: string;
+    location: string;
+    region?: { x: number; y: number; width: number; height: number };
+  };
 }
 
 interface CategoryData {
@@ -120,6 +125,86 @@ function StatusIcon({ status }: { status: 'pass' | 'warn' | 'fail' }) {
   return (
     <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${styles[status]}`}>
       {status === 'pass' ? <Icons.check /> : status === 'warn' ? <Icons.alert /> : <Icons.x />}
+    </div>
+  );
+}
+
+function getScreenshotUrl(pageUrl: string): string {
+  return `https://image.thum.io/get/width/1200/crop/800/noanimate/${pageUrl}`;
+}
+
+function EvidenceButton({ evidence }: { evidence: NonNullable<CheckItem['evidence']> }) {
+  const [showScreenshot, setShowScreenshot] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const screenshotUrl = getScreenshotUrl(evidence.pageUrl);
+
+  return (
+    <div className="mt-2 flex items-start gap-2">
+      <a
+        href={evidence.pageUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-[12px] text-blue-600 hover:text-blue-800 transition-colors"
+        title={evidence.location}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+        {evidence.location}
+      </a>
+      <button
+        onClick={() => setShowScreenshot(true)}
+        className="inline-flex items-center gap-1 text-[12px] text-gray-400 hover:text-orange-600 transition-colors cursor-pointer"
+        title="查看截图证据"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        截图
+      </button>
+      {showScreenshot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowScreenshot(false)}>
+          <div className="relative max-w-4xl max-h-[80vh] overflow-auto bg-white rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 flex items-center justify-between px-4 py-2 bg-gray-50 border-b z-10">
+              <span className="text-xs text-gray-500">{evidence.location}</span>
+              <button onClick={() => setShowScreenshot(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <div className="relative">
+              {imgError ? (
+                <div className="flex items-center justify-center h-48 text-gray-400 text-sm">截图加载失败，请点击链接查看原页面</div>
+              ) : (
+                <img
+                  src={screenshotUrl}
+                  alt={`Screenshot evidence for: ${evidence.location}`}
+                  className="w-full h-auto"
+                  loading="lazy"
+                  onError={() => setImgError(true)}
+                />
+              )}
+              {evidence.region && !imgError && (
+                <div
+                  className="absolute border-2 border-red-500 bg-red-500/20 pointer-events-none"
+                  style={{
+                    left: `${evidence.region.x}%`,
+                    top: `${evidence.region.y}%`,
+                    width: `${evidence.region.width}%`,
+                    height: `${evidence.region.height}%`,
+                  }}
+                >
+                  <div className="absolute -top-5 left-0 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap">
+                    问题区域
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -219,6 +304,9 @@ function CategoryCard({ title, icon, data, color }: { title: string; icon: React
                     <span className="mt-0.5 shrink-0"><Icons.lightbulb /></span>
                     {check.suggestion}
                   </p>
+                )}
+                {check.evidence && check.evidence.pageUrl && (
+                  <EvidenceButton evidence={check.evidence} />
                 )}
               </div>
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-md shrink-0 ${
