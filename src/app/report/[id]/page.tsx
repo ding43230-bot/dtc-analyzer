@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 // SVG Icons
@@ -72,7 +72,7 @@ interface CheckItem {
   evidence?: {
     pageUrl: string;
     location: string;
-    region?: { x: number; y: number; width: number; height: number };
+    selector?: string;
   };
 }
 
@@ -133,10 +133,56 @@ function getScreenshotUrl(pageUrl: string): string {
   return `https://image.thum.io/get/width/1200/full/noanimate/${pageUrl}`;
 }
 
+const HIGHLIGHT_CSS = `
+.__dtc_highlight__ {
+  outline: 3px solid #ef4444 !important;
+  outline-offset: 3px !important;
+  background-color: rgba(239, 68, 68, 0.08) !important;
+  position: relative !important;
+  z-index: 2147483646 !important;
+  scroll-margin-top: 120px;
+}
+.__dtc_highlight__::after {
+  content: '\\26A0 问题区域';
+  position: absolute;
+  top: -24px;
+  left: 0;
+  background: #ef4444;
+  color: white;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  z-index: 2147483647;
+  font-family: system-ui, sans-serif;
+  pointer-events: none;
+}
+`;
+
 function EvidenceButton({ evidence }: { evidence: NonNullable<CheckItem['evidence']> }) {
-  const [showScreenshot, setShowScreenshot] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [mode, setMode] = useState<'iframe' | 'screenshot'>('iframe');
   const [imgError, setImgError] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const screenshotUrl = getScreenshotUrl(evidence.pageUrl);
+
+  const handleIframeLoad = useCallback(() => {
+    if (!iframeRef.current || !evidence.selector) return;
+    try {
+      const doc = iframeRef.current.contentDocument;
+      if (!doc) { setMode('screenshot'); return; }
+      const style = doc.createElement('style');
+      style.textContent = HIGHLIGHT_CSS;
+      doc.head.appendChild(style);
+      const el = doc.querySelector(evidence.selector);
+      if (el) {
+        el.classList.add('__dtc_highlight__');
+        setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+      }
+    } catch {
+      setMode('screenshot');
+    }
+  }, [evidence.selector]);
 
   return (
     <div className="mt-2 flex items-start gap-2">
@@ -155,50 +201,57 @@ function EvidenceButton({ evidence }: { evidence: NonNullable<CheckItem['evidenc
         {evidence.location}
       </a>
       <button
-        onClick={() => setShowScreenshot(true)}
+        onClick={() => { setShowModal(true); setMode('iframe'); setImgError(false); }}
         className="inline-flex items-center gap-1 text-[12px] text-gray-400 hover:text-orange-600 transition-colors cursor-pointer"
-        title="查看截图证据"
+        title="查看页面证据"
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
           <circle cx="12" cy="12" r="3"/>
         </svg>
-        截图
+        查看
       </button>
-      {showScreenshot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowScreenshot(false)}>
-          <div className="relative max-w-4xl max-h-[80vh] overflow-auto bg-white rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 flex items-center justify-between px-4 py-2 bg-gray-50 border-b z-10">
-              <span className="text-xs text-gray-500">{evidence.location}</span>
-              <button onClick={() => setShowScreenshot(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-              </button>
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowModal(false)}>
+          <div className="relative w-[90vw] max-w-5xl h-[85vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b shrink-0">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500">{evidence.location}</span>
+                {mode === 'iframe' && evidence.selector && (
+                  <span className="text-[11px] text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded">{evidence.selector}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {mode === 'iframe' && (
+                  <button onClick={() => setMode('screenshot')} className="text-[11px] text-gray-400 hover:text-orange-600 cursor-pointer px-2 py-1 rounded hover:bg-gray-100">切换截图</button>
+                )}
+                <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              </div>
             </div>
-            <div className="relative">
-              {imgError ? (
-                <div className="flex items-center justify-center h-48 text-gray-400 text-sm">截图加载失败，请点击链接查看原页面</div>
-              ) : (
-                <img
-                  src={screenshotUrl}
-                  alt={`Screenshot evidence for: ${evidence.location}`}
-                  className="w-full h-auto"
-                  loading="lazy"
-                  onError={() => setImgError(true)}
+            <div className="flex-1 overflow-hidden">
+              {mode === 'iframe' ? (
+                <iframe
+                  ref={iframeRef}
+                  src={evidence.pageUrl}
+                  sandbox="allow-same-origin allow-scripts allow-forms"
+                  onLoad={handleIframeLoad}
+                  className="w-full h-full border-0"
+                  title="Page evidence"
                 />
-              )}
-              {evidence.region && !imgError && (
-                <div
-                  className="absolute border-2 border-red-500 bg-red-500/20 pointer-events-none"
-                  style={{
-                    left: `${evidence.region.x}%`,
-                    top: `${evidence.region.y}%`,
-                    width: `${evidence.region.width}%`,
-                    height: `${evidence.region.height}%`,
-                  }}
-                >
-                  <div className="absolute -top-5 left-0 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap">
-                    问题区域
-                  </div>
+              ) : (
+                <div className="h-full overflow-auto">
+                  {imgError ? (
+                    <div className="flex items-center justify-center h-48 text-gray-400 text-sm">截图加载失败，请点击链接查看原页面</div>
+                  ) : (
+                    <img
+                      src={screenshotUrl}
+                      alt={`Screenshot: ${evidence.location}`}
+                      className="w-full h-auto"
+                      onError={() => setImgError(true)}
+                    />
+                  )}
                 </div>
               )}
             </div>

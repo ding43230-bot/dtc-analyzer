@@ -24,7 +24,7 @@ interface AICheckItem {
   evidence?: {
     pageUrl: string;
     location: string;
-    region?: { x: number; y: number; width: number; height: number };
+    selector?: string;
   };
 }
 
@@ -161,14 +161,7 @@ function parseAIResponse(raw: string): AICategoryResult {
           evidence: {
             pageUrl: c.evidence.pageUrl || '',
             location: c.evidence.location || '',
-            ...(c.evidence.region ? {
-              region: {
-                x: Number(c.evidence.region.x) || 0,
-                y: Number(c.evidence.region.y) || 0,
-                width: Number(c.evidence.region.width) || 30,
-                height: Number(c.evidence.region.height) || 20,
-              }
-            } : {}),
+            selector: c.evidence.selector || '',
           }
         } : {}),
       })),
@@ -183,7 +176,7 @@ function parseAIResponse(raw: string): AICategoryResult {
 const EVIDENCE_INSTRUCTION = `证据要求（必须严格遵守）：
 - pageUrl：必须使用"主要链接"中列出的具体内链URL，禁止全部使用首页URL。例如：产品相关问题→用产品详情页链接，导航问题→用首页，表单/订阅问题→用包含表单的页面链接。不同检查项应指向不同页面，体现问题的具体位置。
 - location：中文描述问题位置，如"产品详情页-购买按钮"、"页脚Newsletter表单"、"集合页-筛选器"。
-- region：可选，截图中问题区域的百分比坐标{x,y,width,height}。
+- selector：CSS选择器，用于在页面上高亮问题元素。例如"nav .menu-toggle"、"footer input[type='email']"、".product-card .add-to-cart"、"#hero .cta-button"。选择器要具体到能定位到唯一元素。
 - 禁止所有checks的pageUrl都相同。每个check必须指向最相关的具体页面。`;
 
 async function analyzeCategory(systemPrompt: string, userPrompt: string): Promise<AICategoryResult> {
@@ -200,19 +193,19 @@ export async function runClientAnalysis(data: ScrapedData): Promise<FullAIAnalys
   const [uiux, seo, ads, email] = await Promise.all([
     analyzeCategory(
       `你是资深UI/UX设计总监。分析要深入、专业、可执行。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `对以下DTC品牌网站进行UI/UX深度诊断：\n\n${summary}\n\n分析：首屏设计、视觉层级、导航体验、响应式设计、加载性能、CTA设计、表单体验、信任设计。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","region":{"x":0,"y":0,"width":30,"height":20}}}],"issues":[],"suggestions":[]}。checks必须8项。`
+      `对以下DTC品牌网站进行UI/UX深度诊断：\n\n${summary}\n\n分析：首屏设计、视觉层级、导航体验、响应式设计、加载性能、CTA设计、表单体验、信任设计。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}。checks必须8项。`
     ),
     analyzeCategory(
       `你是资深SEO总监。分析要基于数据，给出具体技术建议。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `对以下DTC品牌网站进行SEO/GEO深度诊断：\n\n${summary}\n\n分析：Meta标签、标题层级、内容质量、结构化数据、图片SEO、内部链接、GEO优化、移动端SEO。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","region":{"x":0,"y":0,"width":30,"height":20}}}],"issues":[],"suggestions":[]}。checks必须8项。`
+      `对以下DTC品牌网站进行SEO/GEO深度诊断：\n\n${summary}\n\n分析：Meta标签、标题层级、内容质量、结构化数据、图片SEO、内部链接、GEO优化、移动端SEO。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}。checks必须8项。`
     ),
     analyzeCategory(
       `你是资深广告转化优化总监。分析要基于CRO最佳实践。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `对以下DTC品牌网站进行广告转化深度诊断：\n\n${summary}\n\n分析：价值主张、CTA设计、信任元素、社会证明、产品展示、转化路径、定价策略、结账体验。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","region":{"x":0,"y":0,"width":30,"height":20}}}],"issues":[],"suggestions":[]}。checks必须8项。`
+      `对以下DTC品牌网站进行广告转化深度诊断：\n\n${summary}\n\n分析：价值主张、CTA设计、信任元素、社会证明、产品展示、转化路径、定价策略、结账体验。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}。checks必须8项。`
     ),
     analyzeCategory(
       `你是资深邮件营销总监。分析要基于DTC邮件营销最佳实践。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `对以下DTC品牌网站进行邮件营销深度诊断：\n\n${summary}\n\n分析：邮箱捕获入口、订阅激励、线索捕获机制、邮件自动化、个性化能力、合规性、多渠道协同、生命周期营销。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","region":{"x":0,"y":0,"width":30,"height":20}}}],"issues":[],"suggestions":[]}。checks必须6-8项。`
+      `对以下DTC品牌网站进行邮件营销深度诊断：\n\n${summary}\n\n分析：邮箱捕获入口、订阅激励、线索捕获机制、邮件自动化、个性化能力、合规性、多渠道协同、生命周期营销。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}。checks必须6-8项。`
     ),
   ]);
 
