@@ -13,14 +13,26 @@ export async function GET(request: NextRequest) {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
       redirect: 'follow',
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {
       return NextResponse.json({ error: `HTTP ${res.status}` }, { status: 502 });
     }
 
+    const contentType = res.headers.get('content-type') || '';
     const html = await res.text();
+
+    // Validate it's actually HTML, not an error page or empty
+    if (!html || html.trim().length < 50) {
+      return NextResponse.json({ error: 'Empty or too short response' }, { status: 502 });
+    }
+
+    // If content-type suggests JSON (error response), reject
+    if (contentType.includes('application/json') && !html.trim().startsWith('<')) {
+      return NextResponse.json({ error: 'Got JSON instead of HTML' }, { status: 502 });
+    }
+
     return new NextResponse(html, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });

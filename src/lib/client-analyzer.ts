@@ -134,7 +134,7 @@ async function callProxy(messages: Array<{role: string; content: string}>): Prom
         model,
         messages,
         temperature: 0.2,
-        max_tokens: 4000,
+        max_tokens: 8000,
       }),
     });
     if (!res.ok) {
@@ -166,13 +166,28 @@ function repairJSON(str: string): string {
     else if (c === '}') { if (stack[stack.length-1] === '{') stack.pop(); }
     else if (c === ']') { if (stack[stack.length-1] === '[') stack.pop(); }
   }
-  if (inString) json += '"';
+  // Handle truncation: close unclosed strings, arrays, objects
+  if (inString) {
+    // Check if we're mid-value after a colon — likely truncated
+    const lastColon = json.lastIndexOf(':');
+    const lastQuote = json.lastIndexOf('"');
+    if (lastColon > lastQuote) {
+      // We're in a value string that was truncated — close it
+      json += '"';
+    }
+  }
   while (stack.length > 0) { const l = stack.pop(); json += l === '[' ? ']' : '}'; }
   json = json.replace(/,\s*([\]}])/g, '$1');
+  // Also handle trailing comma + truncated value
+  json = json.replace(/:\s*"([^"]*)$/, ':"$1"');
   return json;
 }
 
 function parseAIResponse(raw: string): AICategoryResult {
+  if (!raw || raw.trim().length === 0) {
+    console.error('AI returned empty response');
+    return { score: 50, summary: 'AI返回空响应', checks: [], issues: ['AI未返回有效内容'], suggestions: [] };
+  }
   try {
     const repaired = repairJSON(raw);
     const parsed = JSON.parse(repaired);
@@ -195,8 +210,18 @@ function parseAIResponse(raw: string): AICategoryResult {
       issues: parsed.issues || [],
       suggestions: parsed.suggestions || [],
     };
-  } catch {
-    return { score: 50, summary: '分析结果解析失败', checks: [], issues: ['无法解析AI分析结果'], suggestions: [] };
+  } catch (e) {
+    console.error('AI response parse failed. Raw (first 500):', raw.substring(0, 500));
+    // Fallback: try to extract score from raw text
+    const scoreMatch = raw.match(/"score"\s*:\s*(\d+)/);
+    const summaryMatch = raw.match(/"summary"\s*:\s*"([^"]*)"/);
+    return {
+      score: scoreMatch ? Math.min(100, Math.max(0, parseInt(scoreMatch[1]))) : 50,
+      summary: summaryMatch ? summaryMatch[1] : '分析结果解析失败，请重试',
+      checks: [],
+      issues: ['无法解析AI分析结果'],
+      suggestions: [],
+    };
   }
 }
 

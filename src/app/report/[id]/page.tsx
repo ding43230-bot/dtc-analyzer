@@ -133,24 +133,39 @@ function getScreenshotUrl(pageUrl: string): string {
   return `https://image.thum.io/get/width/1200/full/noanimate/${pageUrl}`;
 }
 
+function getFallbackScreenshotUrl(pageUrl: string): string {
+  return `https://api.microlink.io/?url=${encodeURIComponent(pageUrl)}&screenshot=true&meta=false&embed=screenshot.url`;
+}
+
 function EvidenceButton({ evidence }: { evidence: NonNullable<CheckItem['evidence']> }) {
   const [showModal, setShowModal] = useState(false);
   const [srcdoc, setSrcdoc] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [useFallback, setUseFallback] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const screenshotUrl = getScreenshotUrl(evidence.pageUrl);
+  const screenshotUrl = useFallback ? getFallbackScreenshotUrl(evidence.pageUrl) : getScreenshotUrl(evidence.pageUrl);
 
   const openModal = useCallback(async () => {
     setShowModal(true);
     setSrcdoc(null);
     setImgError(false);
+    setUseFallback(false);
     if (!evidence.selector) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/fetch-page?url=${encodeURIComponent(evidence.pageUrl)}`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      const res = await fetch(`/api/fetch-page?url=${encodeURIComponent(evidence.pageUrl)}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
       if (!res.ok) throw new Error('fetch failed');
       const html = await res.text();
+      // Validate we got real HTML content
+      if (!html || html.length < 100 || (!html.includes('<html') && !html.includes('<HTML') && !html.includes('<body'))) {
+        throw new Error('invalid html');
+      }
       const baseTag = `<base href="${evidence.pageUrl}">`;
       const hlCss = `<style>
 .__hl__ { outline: 3px solid #ef4444 !important; outline-offset: 3px !important; background: rgba(239,68,68,0.08) !important; position: relative !important; }
@@ -167,7 +182,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const injected = html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}${hlCss}${hlScript}`);
       setSrcdoc(injected);
     } catch {
-      setSrcdoc(null);
+      setSrcdoc(null); // Falls back to screenshot
     } finally {
       setLoading(false);
     }
@@ -212,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function() {
               </div>
               <div className="flex items-center gap-2">
                 {srcdoc && (
-                  <button onClick={() => { setSrcdoc(null); setImgError(false); }} className="text-[11px] text-gray-400 hover:text-orange-600 cursor-pointer px-2 py-1 rounded hover:bg-gray-100">切换截图</button>
+                  <button onClick={() => { setSrcdoc(null); setImgError(false); setUseFallback(false); }} className="text-[11px] text-gray-400 hover:text-orange-600 cursor-pointer px-2 py-1 rounded hover:bg-gray-100">切换截图</button>
                 )}
                 <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
@@ -232,14 +247,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 />
               ) : (
                 <div className="h-full overflow-auto">
-                  {imgError ? (
-                    <div className="flex items-center justify-center h-48 text-gray-400 text-sm">截图加载失败，请点击链接查看原页面</div>
+                  {imgError && useFallback ? (
+                    <div className="flex flex-col items-center justify-center h-48 gap-3 text-gray-400 text-sm">
+                      <p>截图加载失败</p>
+                      <a href={evidence.pageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">查看原页面 →</a>
+                    </div>
                   ) : (
                     <img
                       src={screenshotUrl}
                       alt={`Screenshot: ${evidence.location}`}
                       className="w-full h-auto"
-                      onError={() => setImgError(true)}
+                      onError={() => {
+                        if (!useFallback) {
+                          setUseFallback(true); // Try fallback service
+                        } else {
+                          setImgError(true); // Both failed
+                        }
+                      }}
                     />
                   )}
                 </div>
