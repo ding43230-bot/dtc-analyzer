@@ -130,7 +130,7 @@ function StatusIcon({ status }: { status: 'pass' | 'warn' | 'fail' }) {
 }
 
 function getScreenshotUrl(pageUrl: string): string {
-  return `https://image.thum.io/get/width/1200/crop/800/noanimate/${pageUrl}`;
+  return `https://image.thum.io/get/width/1200/full/noanimate/${pageUrl}`;
 }
 
 function EvidenceButton({ evidence }: { evidence: NonNullable<CheckItem['evidence']> }) {

@@ -68,7 +68,7 @@ export async function scrapeWebsite(url: string): Promise<ScrapedData> {
   // Links (first 30)
   const links: Array<{ href: string; text: string; isExternal: boolean }> = [];
   const origin = new URL(url).origin;
-  $('a').slice(0, 30).each((_, el) => {
+  $('a').slice(0, 60).each((_, el) => {
     const href = $(el).attr('href');
     if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
       const resolved = resolveUrl(url, href);

@@ -85,7 +85,7 @@ H2(${h2s.length}): ${h2s.join(' | ') || '无'}
 图片: ${images.length}张(无alt: ${imagesWithoutAlt}张)
 内部链接: ${internalLinks.length}个, 外部链接: ${externalLinks.length}个
 表单: ${forms.length}个, 邮箱输入: ${emailInputs ? '有' : '无'}
-主要链接(前10): ${links.slice(0, 10).map(l => `${l.text || '(无文字)'} -> ${l.href}`).join('\n  ')}
+主要链接(前15): ${links.slice(0, 15).map(l => `${l.text || '(无文字)'} -> ${l.href}`).join('\n  ')}
 主要图片(前5): ${images.slice(0, 5).map(i => `src=${i.src}, alt=${i.alt || '(无alt)'}`).join('\n  ')}
 内容(前1500字): ${data.content.substring(0, 1500)}
 `.trim();
@@ -107,7 +107,7 @@ async function callProxy(messages: Array<{role: string; content: string}>): Prom
         model,
         messages,
         temperature: 0.2,
-        max_tokens: 3500,
+        max_tokens: 4000,
       }),
     });
     if (!res.ok) {
@@ -180,7 +180,11 @@ function parseAIResponse(raw: string): AICategoryResult {
   }
 }
 
-const EVIDENCE_INSTRUCTION = `证据要求：每个checks项必须包含evidence字段，指向该问题的具体位置。pageUrl使用爬取数据中的实际链接（如"主要链接"中列出的URL），location用中文描述问题所在位置（如"首屏CTA按钮"、"页脚订阅表单"、"导航菜单"）。region是可选的截图区域坐标（百分比x/y/width/height），用于在截图上标出问题位置。如果某个检查项是关于缺失元素（如"缺少xxx"），则pageUrl使用首页URL，location描述应该在哪里找到该元素。`;
+const EVIDENCE_INSTRUCTION = `证据要求（必须严格遵守）：
+- pageUrl：必须使用"主要链接"中列出的具体内链URL，禁止全部使用首页URL。例如：产品相关问题→用产品详情页链接，导航问题→用首页，表单/订阅问题→用包含表单的页面链接。不同检查项应指向不同页面，体现问题的具体位置。
+- location：中文描述问题位置，如"产品详情页-购买按钮"、"页脚Newsletter表单"、"集合页-筛选器"。
+- region：可选，截图中问题区域的百分比坐标{x,y,width,height}。
+- 禁止所有checks的pageUrl都相同。每个check必须指向最相关的具体页面。`;
 
 async function analyzeCategory(systemPrompt: string, userPrompt: string): Promise<AICategoryResult> {
   const raw = await callProxy([
