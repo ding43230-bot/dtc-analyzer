@@ -61,7 +61,8 @@ export default function Home() {
       // Step 2: Client-side AI Analysis (no server timeout)
       setProgress('正在AI深度分析（UI/UX专家）...');
 
-      const aiResult = await runClientAnalysis(scrapeData.data);
+      const { homepage, pages } = scrapeData.data;
+      const aiResult = await runClientAnalysis(homepage, pages);
 
       setProgress('正在匹配服务推荐...');
 

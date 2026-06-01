@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scrapeWebsite } from '@/lib/scraper';
+import { scrapeMultiplePages } from '@/lib/scraper';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,14 +15,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
     }
 
-    console.log('Scraping website:', url);
+    console.log('Scraping website (multi-page):', url);
     const startTime = Date.now();
-    const scrapedData = await scrapeWebsite(url);
-    console.log(`Scraping completed in ${Date.now() - startTime}ms`);
+    const data = await scrapeMultiplePages(url);
+    console.log(`Scraping completed in ${Date.now() - startTime}ms (${data.pages.length} sub-pages)`);
 
     return NextResponse.json({
       success: true,
-      data: scrapedData,
+      data,
     });
   } catch (error) {
     console.error('Scrape error:', error);

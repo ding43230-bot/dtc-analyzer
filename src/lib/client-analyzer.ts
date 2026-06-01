@@ -1,5 +1,15 @@
 // Client-side AI analyzer - calls proxy endpoint, runs analysis logic in browser
 
+interface PageSummary {
+  url: string;
+  title: string;
+  h1: string;
+  headings: string;
+  content: string;
+  images: Array<{ src: string; alt: string }>;
+  forms: Array<{ action: string; method: string; inputs: string[] }>;
+}
+
 interface ScrapedData {
   url: string;
   title: string;
@@ -56,7 +66,7 @@ const SCORING_RUBRIC = `
 | 81-100 | 优秀 | 超越行业水平 |
 `;
 
-function buildScrapedDataSummary(data: ScrapedData): string {
+function buildScrapedDataSummary(data: ScrapedData, pages?: PageSummary[]): string {
   const headings = data.headings || [];
   const images = data.images || [];
   const links = data.links || [];
@@ -72,7 +82,8 @@ function buildScrapedDataSummary(data: ScrapedData): string {
   const externalLinks = links.filter(l => l.isExternal);
   const emailInputs = forms.some(f => (f.inputs || []).some(i => (i || '').toLowerCase().includes('email')));
 
-  return `
+  let summary = `
+=== 首页 ===
 URL: ${data.url}
 标题: ${data.title || '无'}
 Meta描述: ${data.description || '无'}
@@ -87,8 +98,24 @@ H2(${h2s.length}): ${h2s.join(' | ') || '无'}
 表单: ${forms.length}个, 邮箱输入: ${emailInputs ? '有' : '无'}
 主要链接(前15): ${links.slice(0, 15).map(l => `${l.text || '(无文字)'} -> ${l.href}`).join('\n  ')}
 主要图片(前5): ${images.slice(0, 5).map(i => `src=${i.src}, alt=${i.alt || '(无alt)'}`).join('\n  ')}
-内容(前1500字): ${data.content.substring(0, 1500)}
-`.trim();
+内容(前1500字): ${data.content.substring(0, 1500)}`;
+
+  if (pages && pages.length > 0) {
+    for (const p of pages) {
+      const emailInPage = p.forms.some(f => f.inputs.some(i => i.toLowerCase().includes('email')));
+      summary += `
+
+=== 子页面: ${p.url === data.url ? '首页' : new URL(p.url).pathname} ===
+URL: ${p.url}
+标题: ${p.title || '无'}
+H1: ${p.h1 || '无'}
+H2/H3: ${p.headings || '无'}
+图片: ${p.images.length}张, 表单: ${p.forms.length}个, 邮箱输入: ${emailInPage ? '有' : '无'}
+内容(前500字): ${p.content.substring(0, 500)}`;
+    }
+  }
+
+  return summary.trim();
 }
 
 async function callProxy(messages: Array<{role: string; content: string}>): Promise<string> {
@@ -187,8 +214,8 @@ async function analyzeCategory(systemPrompt: string, userPrompt: string): Promis
   return parseAIResponse(raw);
 }
 
-export async function runClientAnalysis(data: ScrapedData): Promise<FullAIAnalysis> {
-  const summary = buildScrapedDataSummary(data);
+export async function runClientAnalysis(data: ScrapedData, pages?: PageSummary[]): Promise<FullAIAnalysis> {
+  const summary = buildScrapedDataSummary(data, pages);
 
   const [uiux, seo, ads, email] = await Promise.all([
     analyzeCategory(

@@ -133,56 +133,45 @@ function getScreenshotUrl(pageUrl: string): string {
   return `https://image.thum.io/get/width/1200/full/noanimate/${pageUrl}`;
 }
 
-const HIGHLIGHT_CSS = `
-.__dtc_highlight__ {
-  outline: 3px solid #ef4444 !important;
-  outline-offset: 3px !important;
-  background-color: rgba(239, 68, 68, 0.08) !important;
-  position: relative !important;
-  z-index: 2147483646 !important;
-  scroll-margin-top: 120px;
-}
-.__dtc_highlight__::after {
-  content: '\\26A0 问题区域';
-  position: absolute;
-  top: -24px;
-  left: 0;
-  background: #ef4444;
-  color: white;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 3px;
-  white-space: nowrap;
-  z-index: 2147483647;
-  font-family: system-ui, sans-serif;
-  pointer-events: none;
-}
-`;
-
 function EvidenceButton({ evidence }: { evidence: NonNullable<CheckItem['evidence']> }) {
   const [showModal, setShowModal] = useState(false);
-  const [mode, setMode] = useState<'iframe' | 'screenshot'>('iframe');
+  const [srcdoc, setSrcdoc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [imgError, setImgError] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const screenshotUrl = getScreenshotUrl(evidence.pageUrl);
 
-  const handleIframeLoad = useCallback(() => {
-    if (!iframeRef.current || !evidence.selector) return;
+  const openModal = useCallback(async () => {
+    setShowModal(true);
+    setSrcdoc(null);
+    setImgError(false);
+    if (!evidence.selector) return;
+    setLoading(true);
     try {
-      const doc = iframeRef.current.contentDocument;
-      if (!doc) { setMode('screenshot'); return; }
-      const style = doc.createElement('style');
-      style.textContent = HIGHLIGHT_CSS;
-      doc.head.appendChild(style);
-      const el = doc.querySelector(evidence.selector);
-      if (el) {
-        el.classList.add('__dtc_highlight__');
-        setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
-      }
+      const res = await fetch(`/api/fetch-page?url=${encodeURIComponent(evidence.pageUrl)}`);
+      if (!res.ok) throw new Error('fetch failed');
+      const html = await res.text();
+      const baseTag = `<base href="${evidence.pageUrl}">`;
+      const hlCss = `<style>
+.__hl__ { outline: 3px solid #ef4444 !important; outline-offset: 3px !important; background: rgba(239,68,68,0.08) !important; position: relative !important; }
+.__hl__::after { content: '\\26A0 问题区域'; position: absolute; top: -24px; left: 0; background: #ef4444; color: #fff; font: 11px system-ui; padding: 2px 8px; border-radius: 3px; white-space: nowrap; z-index: 2147483647; pointer-events: none; }
+</style>`;
+      const hlScript = `<script>
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    var el = document.querySelector('${evidence.selector.replace(/'/g, "\\'")}');
+    if (el) { el.classList.add('__hl__'); el.scrollIntoView({ behavior: 'instant', block: 'center' }); }
+  } catch(e) {}
+});
+</script>`;
+      const injected = html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}${hlCss}${hlScript}`);
+      setSrcdoc(injected);
     } catch {
-      setMode('screenshot');
+      setSrcdoc(null);
+    } finally {
+      setLoading(false);
     }
-  }, [evidence.selector]);
+  }, [evidence.pageUrl, evidence.selector]);
 
   return (
     <div className="mt-2 flex items-start gap-2">
@@ -201,7 +190,7 @@ function EvidenceButton({ evidence }: { evidence: NonNullable<CheckItem['evidenc
         {evidence.location}
       </a>
       <button
-        onClick={() => { setShowModal(true); setMode('iframe'); setImgError(false); }}
+        onClick={openModal}
         className="inline-flex items-center gap-1 text-[12px] text-gray-400 hover:text-orange-600 transition-colors cursor-pointer"
         title="查看页面证据"
       >
@@ -217,13 +206,13 @@ function EvidenceButton({ evidence }: { evidence: NonNullable<CheckItem['evidenc
             <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b shrink-0">
               <div className="flex items-center gap-3">
                 <span className="text-xs text-gray-500">{evidence.location}</span>
-                {mode === 'iframe' && evidence.selector && (
+                {evidence.selector && (
                   <span className="text-[11px] text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded">{evidence.selector}</span>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {mode === 'iframe' && (
-                  <button onClick={() => setMode('screenshot')} className="text-[11px] text-gray-400 hover:text-orange-600 cursor-pointer px-2 py-1 rounded hover:bg-gray-100">切换截图</button>
+                {srcdoc && (
+                  <button onClick={() => { setSrcdoc(null); setImgError(false); }} className="text-[11px] text-gray-400 hover:text-orange-600 cursor-pointer px-2 py-1 rounded hover:bg-gray-100">切换截图</button>
                 )}
                 <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
@@ -231,12 +220,13 @@ function EvidenceButton({ evidence }: { evidence: NonNullable<CheckItem['evidenc
               </div>
             </div>
             <div className="flex-1 overflow-hidden">
-              {mode === 'iframe' ? (
+              {loading ? (
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm">加载页面中...</div>
+              ) : srcdoc ? (
                 <iframe
                   ref={iframeRef}
-                  src={evidence.pageUrl}
-                  sandbox="allow-same-origin allow-scripts allow-forms"
-                  onLoad={handleIframeLoad}
+                  srcDoc={srcdoc}
+                  sandbox="allow-same-origin"
                   className="w-full h-full border-0"
                   title="Page evidence"
                 />
