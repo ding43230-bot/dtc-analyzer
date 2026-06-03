@@ -232,11 +232,16 @@ const EVIDENCE_INSTRUCTION = `证据要求（必须严格遵守）：
 - 禁止所有checks的pageUrl都相同。每个check必须指向最相关的具体页面。`;
 
 async function analyzeCategory(systemPrompt: string, userPrompt: string): Promise<AICategoryResult> {
-  const raw = await callProxy([
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: userPrompt },
-  ]);
-  return parseAIResponse(raw);
+  try {
+    const raw = await callProxy([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ]);
+    return parseAIResponse(raw);
+  } catch (e: any) {
+    console.error('analyzeCategory failed:', e?.message);
+    return { score: 50, summary: '分析失败: ' + (e?.message || '未知错误'), checks: [], issues: ['API调用失败'], suggestions: [] };
+  }
 }
 
 export async function runClientAnalysis(data: ScrapedData, pages?: PageSummary[]): Promise<FullAIAnalysis> {

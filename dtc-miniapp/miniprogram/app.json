@@ -1,0 +1,14 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/report/report"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#FF6B35",
+    "navigationBarTitleText": "DTC网站分析",
+    "navigationBarTextStyle": "white"
+  },
+  "cloud": true,
+  "sitemapLocation": "sitemap.json"
+}

@@ -1,0 +1,96 @@
+<view class="container">
+  <!-- 背景装饰 -->
+  <view class="bg-decoration"></view>
+
+  <!-- 头部 -->
+  <view class="header">
+    <view class="logo-section">
+      <text class="logo-icon">🎯</text>
+      <text class="logo-text">DTC Analyzer</text>
+    </view>
+    <text class="subtitle">专业DTC品牌网站分析工具</text>
+  </view>
+
+  <!-- 输入区域 -->
+  <view class="input-card">
+    <view class="input-wrapper">
+      <text class="input-icon">🔗</text>
+      <input
+        class="url-input"
+        placeholder="输入网站URL开始分析"
+        placeholder-class="placeholder"
+        value="{{url}}"
+        bindinput="onInputChange"
+        bindconfirm="analyze"
+      />
+    </view>
+    <button class="analyze-btn" bindtap="analyze" loading="{{loading}}">
+      <text wx:if="{{!loading}}">开始分析</text>
+    </button>
+  </view>
+
+  <!-- 示例网站 -->
+  <view class="examples">
+    <text class="examples-label">示例网站</text>
+    <view class="examples-list">
+      <view class="example-item" wx:for="{{examples}}" wx:key="index" bindtap="useExample" data-url="{{item.url}}">
+        <text class="example-icon">{{item.icon}}</text>
+        <text class="example-name">{{item.name}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 分析进度 -->
+  <view class="progress-card" wx:if="{{loading}}">
+    <view class="progress-header">
+      <text class="progress-icon">⚡</text>
+      <text class="progress-title">正在分析</text>
+    </view>
+    <view class="progress-steps">
+      <view class="step {{currentStep >= 1 ? 'active' : ''}}">
+        <view class="step-dot"></view>
+        <text class="step-text">爬取网站数据</text>
+      </view>
+      <view class="step-line {{currentStep >= 2 ? 'active' : ''}}"></view>
+      <view class="step {{currentStep >= 2 ? 'active' : ''}}">
+        <view class="step-dot"></view>
+        <text class="step-text">AI深度分析</text>
+      </view>
+      <view class="step-line {{currentStep >= 3 ? 'active' : ''}}"></view>
+      <view class="step {{currentStep >= 3 ? 'active' : ''}}">
+        <view class="step-dot"></view>
+        <text class="step-text">生成报告</text>
+      </view>
+    </view>
+    <text class="progress-hint">分析多个页面，约需30-60秒</text>
+  </view>
+
+  <!-- 功能介绍 -->
+  <view class="features" wx:if="{{!loading}}">
+    <view class="feature-card">
+      <text class="feature-icon">🎨</text>
+      <text class="feature-title">UI/UX分析</text>
+      <text class="feature-desc">首屏设计、导航体验、CTA设计</text>
+    </view>
+    <view class="feature-card">
+      <text class="feature-icon">🔍</text>
+      <text class="feature-title">SEO优化</text>
+      <text class="feature-desc">Meta标签、结构化数据、内容质量</text>
+    </view>
+    <view class="feature-card">
+      <text class="feature-icon">📈</text>
+      <text class="feature-title">广告转化</text>
+      <text class="feature-desc">价值主张、信任元素、转化路径</text>
+    </view>
+    <view class="feature-card">
+      <text class="feature-icon">📧</text>
+      <text class="feature-title">邮件营销</text>
+      <text class="feature-desc">邮箱捕获、订阅激励、自动化</text>
+    </view>
+  </view>
+
+  <!-- 错误提示 -->
+  <view class="error-toast" wx:if="{{error}}" bindtap="hideError">
+    <text class="error-text">{{error}}</text>
+  </view>
+</view>

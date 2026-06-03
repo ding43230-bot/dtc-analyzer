@@ -1,0 +1,301 @@
+<view class="container">
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <view class="loading-animation">
+      <view class="pulse"></view>
+      <text class="loading-icon">🎯</text>
+    </view>
+    <text class="loading-title">正在生成报告</text>
+    <text class="loading-desc">AI正在深度分析网站数据...</text>
+  </view>
+
+  <!-- 报告内容 -->
+  <view wx:if="{{!loading && report}}" class="report-content">
+    <!-- 头部 -->
+    <view class="report-header">
+      <view class="header-bg"></view>
+      <view class="header-content">
+        <text class="report-label">DTC 分析报告</text>
+        <view class="overall-score-wrapper">
+          <view class="score-ring">
+            <view class="score-ring-bg"></view>
+            <view class="score-ring-fill {{report.scores.overall >= 70 ? 'good' : report.scores.overall >= 50 ? 'medium' : 'bad'}}"></view>
+            <view class="score-ring-inner">
+              <text class="score-number">{{report.scores.overall}}</text>
+              <text class="score-unit">分</text>
+            </view>
+          </view>
+        </view>
+        <text class="score-url">{{report.url}}</text>
+        <view class="score-level {{report.scores.overall >= 70 ? 'good' : report.scores.overall >= 50 ? 'medium' : 'bad'}}">
+          <text>{{report.scores.overall >= 80 ? '优秀' : report.scores.overall >= 60 ? '良好' : report.scores.overall >= 40 ? '一般' : '较差'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 四维分数 -->
+    <view class="dimension-card">
+      <text class="card-title">四维分析</text>
+      <view class="dimension-grid">
+        <view class="dimension-item">
+          <view class="dimension-circle {{report.scores.uiux >= 70 ? 'good' : report.scores.uiux >= 50 ? 'medium' : 'bad'}}">
+            <text class="dimension-score">{{report.scores.uiux}}</text>
+          </view>
+          <text class="dimension-label">UI/UX</text>
+        </view>
+        <view class="dimension-item">
+          <view class="dimension-circle {{report.scores.seo >= 70 ? 'good' : report.scores.seo >= 50 ? 'medium' : 'bad'}}">
+            <text class="dimension-score">{{report.scores.seo}}</text>
+          </view>
+          <text class="dimension-label">SEO</text>
+        </view>
+        <view class="dimension-item">
+          <view class="dimension-circle {{report.scores.ads >= 70 ? 'good' : report.scores.ads >= 50 ? 'medium' : 'bad'}}">
+            <text class="dimension-score">{{report.scores.ads}}</text>
+          </view>
+          <text class="dimension-label">广告</text>
+        </view>
+        <view class="dimension-item">
+          <view class="dimension-circle {{report.scores.email >= 70 ? 'good' : report.scores.email >= 50 ? 'medium' : 'bad'}}">
+            <text class="dimension-score">{{report.scores.email}}</text>
+          </view>
+          <text class="dimension-label">邮件</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 分析页面来源 -->
+    <view class="pages-card" wx:if="{{report.pages && report.pages.length > 0}}">
+      <text class="card-title">分析页面</text>
+      <view class="pages-list">
+        <view class="page-tag" wx:for="{{report.pages}}" wx:key="index">
+          <text class="page-icon">{{item.type === 'product' ? '🛍️' : item.type === 'collection' ? '📂' : item.type === 'about' ? 'ℹ️' : item.type === 'contact' ? '📞' : item.type === 'blog' ? '📝' : '🔗'}}</text>
+          <text class="page-name">{{item.title || item.url}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 分析板块 -->
+    <view class="analysis-sections">
+      <!-- UI/UX板块 -->
+      <view class="section">
+        <view class="section-header" bindtap="toggleSection" data-key="uiux">
+          <view class="section-icon-wrapper uiux">
+            <text class="section-icon">🎨</text>
+          </view>
+          <view class="section-info">
+            <text class="section-title">UI/UX 设计</text>
+            <text class="section-subtitle">用户体验分析</text>
+          </view>
+          <view class="section-score-wrapper">
+            <text class="section-score {{report.analysis.uiux.score >= 70 ? 'good' : report.analysis.uiux.score >= 50 ? 'medium' : 'bad'}}">
+              {{report.analysis.uiux.score}}
+            </text>
+          </view>
+          <text class="section-arrow {{expanded.uiux ? 'expanded' : ''}}">▼</text>
+        </view>
+        <view class="section-content" wx:if="{{expanded.uiux}}">
+          <view class="summary-text" wx:if="{{report.analysis.uiux.summary}}">
+            <text>{{report.analysis.uiux.summary}}</text>
+          </view>
+          <view wx:if="{{report.analysis.uiux.checks && report.analysis.uiux.checks.length > 0}}">
+            <view class="check-item" wx:for="{{report.analysis.uiux.checks}}" wx:key="index">
+              <view class="check-header">
+                <text class="check-label">{{item.label}}</text>
+                <view class="check-score-badge {{item.score >= 70 ? 'good' : item.score >= 50 ? 'medium' : 'bad'}}">
+                  <text>{{item.score}}</text>
+                </view>
+              </view>
+              <text class="check-feedback">{{item.feedback}}</text>
+              <view class="check-evidence" wx:if="{{item.evidence}}">
+                <text class="evidence-icon">📍</text>
+                <text class="evidence-text">{{item.evidence.description || item.evidence}}</text>
+              </view>
+              <text class="check-suggestion" wx:if="{{item.suggestion}}">💡 {{item.suggestion}}</text>
+            </view>
+          </view>
+          <view class="no-data" wx:else>
+            <text>暂无详细分析数据</text>
+          </view>
+          <view class="issues" wx:if="{{report.analysis.uiux.issues && report.analysis.uiux.issues.length > 0}}">
+            <text class="issues-title">发现的问题</text>
+            <view class="issue-item" wx:for="{{report.analysis.uiux.issues}}" wx:key="index">
+              <text class="issue-dot">⚠️</text>
+              <text class="issue-text">{{item.title || item.description || item}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- SEO板块 -->
+      <view class="section">
+        <view class="section-header" bindtap="toggleSection" data-key="seo">
+          <view class="section-icon-wrapper seo">
+            <text class="section-icon">🔍</text>
+          </view>
+          <view class="section-info">
+            <text class="section-title">SEO/GEO</text>
+            <text class="section-subtitle">搜索引擎优化</text>
+          </view>
+          <view class="section-score-wrapper">
+            <text class="section-score {{report.analysis.seo.score >= 70 ? 'good' : report.analysis.seo.score >= 50 ? 'medium' : 'bad'}}">
+              {{report.analysis.seo.score}}
+            </text>
+          </view>
+          <text class="section-arrow {{expanded.seo ? 'expanded' : ''}}">▼</text>
+        </view>
+        <view class="section-content" wx:if="{{expanded.seo}}">
+          <view class="summary-text" wx:if="{{report.analysis.seo.summary}}">
+            <text>{{report.analysis.seo.summary}}</text>
+          </view>
+          <view wx:if="{{report.analysis.seo.checks && report.analysis.seo.checks.length > 0}}">
+            <view class="check-item" wx:for="{{report.analysis.seo.checks}}" wx:key="index">
+              <view class="check-header">
+                <text class="check-label">{{item.label}}</text>
+                <view class="check-score-badge {{item.score >= 70 ? 'good' : item.score >= 50 ? 'medium' : 'bad'}}">
+                  <text>{{item.score}}</text>
+                </view>
+              </view>
+              <text class="check-feedback">{{item.feedback}}</text>
+              <view class="check-evidence" wx:if="{{item.evidence}}">
+                <text class="evidence-icon">📍</text>
+                <text class="evidence-text">{{item.evidence.description || item.evidence}}</text>
+              </view>
+              <text class="check-suggestion" wx:if="{{item.suggestion}}">💡 {{item.suggestion}}</text>
+            </view>
+          </view>
+          <view class="no-data" wx:else>
+            <text>暂无详细分析数据</text>
+          </view>
+          <view class="issues" wx:if="{{report.analysis.seo.issues && report.analysis.seo.issues.length > 0}}">
+            <text class="issues-title">发现的问题</text>
+            <view class="issue-item" wx:for="{{report.analysis.seo.issues}}" wx:key="index">
+              <text class="issue-dot">⚠️</text>
+              <text class="issue-text">{{item}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 广告转化板块 -->
+      <view class="section">
+        <view class="section-header" bindtap="toggleSection" data-key="ads">
+          <view class="section-icon-wrapper ads">
+            <text class="section-icon">📈</text>
+          </view>
+          <view class="section-info">
+            <text class="section-title">广告转化</text>
+            <text class="section-subtitle">CRO优化分析</text>
+          </view>
+          <view class="section-score-wrapper">
+            <text class="section-score {{report.analysis.ads.score >= 70 ? 'good' : report.analysis.ads.score >= 50 ? 'medium' : 'bad'}}">
+              {{report.analysis.ads.score}}
+            </text>
+          </view>
+          <text class="section-arrow {{expanded.ads ? 'expanded' : ''}}">▼</text>
+        </view>
+        <view class="section-content" wx:if="{{expanded.ads}}">
+          <view class="summary-text" wx:if="{{report.analysis.ads.summary}}">
+            <text>{{report.analysis.ads.summary}}</text>
+          </view>
+          <view wx:if="{{report.analysis.ads.checks && report.analysis.ads.checks.length > 0}}">
+            <view class="check-item" wx:for="{{report.analysis.ads.checks}}" wx:key="index">
+              <view class="check-header">
+                <text class="check-label">{{item.label}}</text>
+                <view class="check-score-badge {{item.score >= 70 ? 'good' : item.score >= 50 ? 'medium' : 'bad'}}">
+                  <text>{{item.score}}</text>
+                </view>
+              </view>
+              <text class="check-feedback">{{item.feedback}}</text>
+              <view class="check-evidence" wx:if="{{item.evidence}}">
+                <text class="evidence-icon">📍</text>
+                <text class="evidence-text">{{item.evidence.description || item.evidence}}</text>
+              </view>
+              <text class="check-suggestion" wx:if="{{item.suggestion}}">💡 {{item.suggestion}}</text>
+            </view>
+          </view>
+          <view class="no-data" wx:else>
+            <text>暂无详细分析数据</text>
+          </view>
+          <view class="issues" wx:if="{{report.analysis.ads.issues && report.analysis.ads.issues.length > 0}}">
+            <text class="issues-title">发现的问题</text>
+            <view class="issue-item" wx:for="{{report.analysis.ads.issues}}" wx:key="index">
+              <text class="issue-dot">⚠️</text>
+              <text class="issue-text">{{item}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 邮件营销板块 -->
+      <view class="section">
+        <view class="section-header" bindtap="toggleSection" data-key="email">
+          <view class="section-icon-wrapper email">
+            <text class="section-icon">📧</text>
+          </view>
+          <view class="section-info">
+            <text class="section-title">邮件营销</text>
+            <text class="section-subtitle">EDM策略分析</text>
+          </view>
+          <view class="section-score-wrapper">
+            <text class="section-score {{report.analysis.email.score >= 70 ? 'good' : report.analysis.email.score >= 50 ? 'medium' : 'bad'}}">
+              {{report.analysis.email.score}}
+            </text>
+          </view>
+          <text class="section-arrow {{expanded.email ? 'expanded' : ''}}">▼</text>
+        </view>
+        <view class="section-content" wx:if="{{expanded.email}}">
+          <view class="summary-text" wx:if="{{report.analysis.email.summary}}">
+            <text>{{report.analysis.email.summary}}</text>
+          </view>
+          <view wx:if="{{report.analysis.email.checks && report.analysis.email.checks.length > 0}}">
+            <view class="check-item" wx:for="{{report.analysis.email.checks}}" wx:key="index">
+              <view class="check-header">
+                <text class="check-label">{{item.label}}</text>
+                <view class="check-score-badge {{item.score >= 70 ? 'good' : item.score >= 50 ? 'medium' : 'bad'}}">
+                  <text>{{item.score}}</text>
+                </view>
+              </view>
+              <text class="check-feedback">{{item.feedback}}</text>
+              <view class="check-evidence" wx:if="{{item.evidence}}">
+                <text class="evidence-icon">📍</text>
+                <text class="evidence-text">{{item.evidence.description || item.evidence}}</text>
+              </view>
+              <text class="check-suggestion" wx:if="{{item.suggestion}}">💡 {{item.suggestion}}</text>
+            </view>
+          </view>
+          <view class="no-data" wx:else>
+            <text>暂无详细分析数据</text>
+          </view>
+          <view class="issues" wx:if="{{report.analysis.email.issues && report.analysis.email.issues.length > 0}}">
+            <text class="issues-title">发现的问题</text>
+            <view class="issue-item" wx:for="{{report.analysis.email.issues}}" wx:key="index">
+              <text class="issue-dot">⚠️</text>
+              <text class="issue-text">{{item}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部按钮 -->
+    <view class="footer">
+      <button class="btn-share" open-type="share">
+        <text>📤 分享报告</text>
+      </button>
+      <button class="btn-primary" bindtap="analyzeAnother">
+        <text>🔄 分析其他网站</text>
+      </button>
+    </view>
+  </view>
+
+  <!-- 错误提示 -->
+  <view class="error-page" wx:if="{{!loading && error}}">
+    <view class="error-icon-wrapper">
+      <text class="error-icon">❌</text>
+    </view>
+    <text class="error-title">分析失败</text>
+    <text class="error-desc">{{error}}</text>
+    <button class="btn-primary" bindtap="goBack">返回首页</button>
+  </view>
+</view>

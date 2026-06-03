@@ -1,0 +1,11 @@
+{
+  "name": "analyze",
+  "version": "1.0.0",
+  "description": "DTC网站分析云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  },
+  "author": "",
+  "license": "ISC"
+}
