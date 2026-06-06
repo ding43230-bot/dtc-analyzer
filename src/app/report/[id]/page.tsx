@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import SimilarWebData from '@/components/SimilarWebData';
 
 // SVG Icons
 const Icons = {
@@ -55,6 +56,16 @@ const Icons = {
       <rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
     </svg>
   ),
+  shield: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+    </svg>
+  ),
+  heart: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+    </svg>
+  ),
   spinner: () => (
     <svg className="animate-spin w-10 h-10" viewBox="0 0 24 24" fill="none">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -93,6 +104,8 @@ interface ReportData {
     seo: number;
     ads: number;
     email: number;
+    tech: number;
+    brand: number;
     overall: number;
   };
   recommendations: Array<{
@@ -106,6 +119,8 @@ interface ReportData {
     seo: CategoryData;
     ads: CategoryData;
     email: CategoryData;
+    tech: CategoryData;
+    brand: CategoryData;
   };
 }
 
@@ -314,7 +329,7 @@ function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
 
 function ScoreBar({ label, score, color }: { label: string; score: number; color: string }) {
   const bgColors: Record<string, string> = {
-    green: 'bg-emerald-500', orange: 'bg-orange-500', purple: 'bg-violet-500', red: 'bg-rose-500',
+    green: 'bg-emerald-500', orange: 'bg-orange-500', purple: 'bg-violet-500', red: 'bg-rose-500', blue: 'bg-blue-500', pink: 'bg-pink-500',
   };
 
   return (
@@ -333,7 +348,7 @@ function ScoreBar({ label, score, color }: { label: string; score: number; color
 function CategoryCard({ title, icon, data, color }: { title: string; icon: React.ReactNode; data: CategoryData; color: string }) {
   const [expanded, setExpanded] = useState(false);
   const borderColors: Record<string, string> = {
-    green: 'border-t-emerald-500', purple: 'border-t-violet-500', orange: 'border-t-orange-500', red: 'border-t-rose-500',
+    green: 'border-t-emerald-500', purple: 'border-t-violet-500', orange: 'border-t-orange-500', red: 'border-t-rose-500', blue: 'border-t-blue-500', pink: 'border-t-pink-500',
   };
 
   const checks: CheckItem[] = data.checks || [];
@@ -495,6 +510,8 @@ export default function ReportPage() {
     { key: 'seo', title: 'SEO/GEO 分析', icon: <Icons.search />, data: report.analysis.seo, color: 'purple' },
     { key: 'ads', title: '广告转化分析', icon: <Icons.trendingUp />, data: report.analysis.ads, color: 'orange' },
     { key: 'email', title: '邮件营销分析', icon: <Icons.mail />, data: report.analysis.email, color: 'red' },
+    { key: 'tech', title: '技术性能分析', icon: <Icons.shield />, data: report.analysis.tech, color: 'blue' },
+    { key: 'brand', title: '品牌故事分析', icon: <Icons.heart />, data: report.analysis.brand, color: 'pink' },
   ];
 
   return (
@@ -513,9 +530,6 @@ export default function ReportPage() {
               </button>
               <div className="h-5 w-px bg-gray-200" />
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-sm shadow-orange-200">
-                  <span className="text-white font-bold text-sm">S</span>
-                </div>
                 <div>
                   <h1 className="text-sm font-semibold text-gray-900">分析报告</h1>
                   <p className="text-[11px] text-gray-400 max-w-xs truncate">{report.url}</p>
@@ -539,6 +553,8 @@ export default function ReportPage() {
             <ScoreBar label="SEO" score={report.scores.seo} color="purple" />
             <ScoreBar label="广告转化" score={report.scores.ads} color="orange" />
             <ScoreBar label="邮件营销" score={report.scores.email} color="red" />
+            <ScoreBar label="技术性能" score={report.scores.tech} color="blue" />
+            <ScoreBar label="品牌故事" score={report.scores.brand} color="pink" />
           </div>
 
           {/* 评分标准说明 */}
@@ -585,6 +601,9 @@ export default function ReportPage() {
             </div>
           </div>
         )}
+
+        {/* SimilarWeb Data */}
+        <SimilarWebData url={report.url} />
 
         {/* Category Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">

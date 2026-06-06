@@ -74,6 +74,8 @@ export default function Home() {
         seo: { score: aiResult.seo.score, issues: aiResult.seo.issues } as any,
         ads: { score: aiResult.ads.score, issues: aiResult.ads.issues } as any,
         email: { score: aiResult.email.score, issues: aiResult.email.issues } as any,
+        tech: { score: aiResult.tech.score, issues: aiResult.tech.issues } as any,
+        brand: { score: aiResult.brand.score, issues: aiResult.brand.issues } as any,
         recommendations: [] as string[],
       };
       const recommendations = matchServices(analysisForMatching);
@@ -92,6 +94,8 @@ export default function Home() {
             seo: { score: aiResult.seo.score, summary: aiResult.seo.summary, checks: aiResult.seo.checks, issues: aiResult.seo.issues, suggestions: aiResult.seo.suggestions },
             ads: { score: aiResult.ads.score, summary: aiResult.ads.summary, checks: aiResult.ads.checks, issues: aiResult.ads.issues, suggestions: aiResult.ads.suggestions },
             email: { score: aiResult.email.score, summary: aiResult.email.summary, checks: aiResult.email.checks, issues: aiResult.email.issues, suggestions: aiResult.email.suggestions },
+            tech: { score: aiResult.tech.score, summary: aiResult.tech.summary, checks: aiResult.tech.checks, issues: aiResult.tech.issues, suggestions: aiResult.tech.suggestions },
+            brand: { score: aiResult.brand.score, summary: aiResult.brand.summary, checks: aiResult.brand.checks, issues: aiResult.brand.issues, suggestions: aiResult.brand.suggestions },
           },
         }));
       } catch {}
@@ -114,12 +118,8 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-[#F8F9FA]">
       {/* ── NAVBAR ── */}
       <nav className="bg-white border-b border-gray-200 h-[62px] flex items-center px-[52px] sticky top-0 z-50 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
-        <a href="/" className="flex items-center gap-2 font-extrabold text-[15px] text-[#111827] no-nowrap tracking-[-0.3px]">
-          <svg width="30" height="20" viewBox="0 0 30 20" fill="none">
-            <path d="M1 10 L5 5 L9 13 L13 2 L17 15 L21 7 L25 11 L29 10"
-                  stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          简跃科技
+        <a href="/" className="flex items-center gap-2 no-nowrap">
+          <img src="/company-logo.png" alt="NextLeap" className="h-9 w-auto object-contain" />
         </a>
 
         <div className="flex-1" />
@@ -148,7 +148,7 @@ export default function Home() {
 
           {/* Subtitle */}
           <p className="text-[15px] text-[#6B7280] leading-[1.8] max-w-[430px]">
-            输入网址，AI 自动分析网站在 UI/UX、SEO、广告转化、邮件营销四大维度的表现，获取专业优化建议
+            输入网址，AI 自动分析网站在 UI/UX、SEO、广告转化、邮件营销、技术性能、品牌故事六大维度的表现，获取专业优化建议
           </p>
 
           {/* Search Box */}
@@ -191,34 +191,6 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Trust Row */}
-          <div className="flex items-center gap-0 mt-2">
-            <div className="flex items-center">
-              {['A', 'B', 'C', 'D', 'E'].map((letter, i) => (
-                <div
-                  key={letter}
-                  className="w-[33px] h-[33px] rounded-full border-[2.5px] border-white -mr-2.5 flex items-center justify-center text-xs font-bold text-white shrink-0"
-                  style={{
-                    background: [
-                      'linear-gradient(135deg,#667eea,#764ba2)',
-                      'linear-gradient(135deg,#f093fb,#f5576c)',
-                      'linear-gradient(135deg,#4facfe,#00f2fe)',
-                      'linear-gradient(135deg,#43e97b,#38f9d7)',
-                      'linear-gradient(135deg,#fa709a,#fee140)',
-                    ][i],
-                    zIndex: 5 - i,
-                  }}
-                >
-                  {letter}
-                </div>
-              ))}
-            </div>
-            <div className="ml-[18px]">
-              <div className="text-[#FBBF24] text-[13px] tracking-[1.5px]">★★★★★</div>
-              <div className="text-[13px] font-bold text-[#111827] mt-0.5">超过 10,000 名用户信赖</div>
-              <div className="text-[11.5px] text-[#9CA3AF]">DTC品牌卖家和营销机构</div>
-            </div>
-          </div>
         </div>
 
         {/* RIGHT: Dashboard Card */}
@@ -302,6 +274,8 @@ export default function Home() {
                           { name: 'SEO', value: '75', up: true },
                           { name: '广告转化', value: '68', up: false },
                           { name: '邮件营销', value: '45', up: false },
+                          { name: '技术性能', value: '71', up: true },
+                          { name: '品牌故事', value: '59', up: false },
                         ].map((m) => (
                           <div key={m.name} className="flex justify-between items-center py-0.5 border-b border-[#F9FAFB] last:border-0 text-[9.5px]">
                             <span className="text-[#6B7280]">{m.name}</span>
@@ -467,12 +441,14 @@ export default function Home() {
           <h2 className="text-3xl font-bold text-[#111827] tracking-tight text-center mb-3">全方位诊断</h2>
           <p className="text-[#6B7280] text-center max-w-xl mx-auto mb-12">从设计体验到营销转化，一站式发现网站的所有问题</p>
 
-          <div className="grid grid-cols-4 gap-5">
+          <div className="grid grid-cols-3 gap-5">
             {[
               { title: 'UI/UX 分析', desc: '页面设计、用户体验、响应式布局和加载速度', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg> },
               { title: 'SEO/GEO 分析', desc: 'Meta标签、关键词、结构化数据和AI搜索优化', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> },
               { title: '广告转化分析', desc: '落地页质量、CTA设计、转化路径和信任元素', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg> },
               { title: '邮件营销分析', desc: '订阅入口、邮件捕获机制和自动化流程', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> },
+              { title: '技术性能分析', desc: '页面速度、安全性、可访问性和Core Web Vitals', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg> },
+              { title: '品牌故事分析', desc: '品牌叙事、视觉调性、信任背书和情感连接', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg> },
             ].map((f, i) => (
               <div key={f.title} className="bg-[#F8F9FA] rounded-xl p-6 border border-gray-100 hover:border-[#F97316] hover:shadow-md transition-all cursor-default animate-fade-in-up" style={{ animationDelay: `${0.2 + i * 0.1}s` }}>
                 <div className="w-11 h-11 rounded-lg bg-orange-50 flex items-center justify-center mb-4">{f.svg}</div>
