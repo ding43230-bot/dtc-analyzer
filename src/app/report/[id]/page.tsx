@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import SimilarWebData from '@/components/SimilarWebData';
 
 // SVG Icons
 const Icons = {
@@ -601,9 +600,6 @@ export default function ReportPage() {
             </div>
           </div>
         )}
-
-        {/* SimilarWeb Data */}
-        <SimilarWebData url={report.url} />
 
         {/* Category Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">

@@ -247,17 +247,23 @@ function parseAIResponse(raw: string): AICategoryResult {
     const repairedJson = repairJSON(raw);
     const parsed = JSON.parse(repairedJson);
     console.log('Parsed successfully:', JSON.stringify(parsed).substring(0, 300));
+    const checks = (parsed.checks || []).map((c: any) => ({
+      label: c.label || '',
+      score: Math.min(100, Math.max(0, c.score || 0)),
+      feedback: c.feedback || '',
+      suggestion: c.suggestion || '',
+    }));
+    let suggestions = parsed.suggestions || [];
+    // 如果suggestions为空，从checks的suggestion字段提取
+    if (suggestions.length === 0) {
+      suggestions = checks.filter((c: any) => c.suggestion).map((c: any) => c.suggestion);
+    }
     return {
       score: Math.min(100, Math.max(0, parsed.score || 0)),
       summary: parsed.summary || '',
-      checks: (parsed.checks || []).map((c: any) => ({
-        label: c.label || '',
-        score: Math.min(100, Math.max(0, c.score || 0)),
-        feedback: c.feedback || '',
-        suggestion: c.suggestion || '',
-      })),
+      checks,
       issues: parsed.issues || [],
-      suggestions: parsed.suggestions || [],
+      suggestions,
     };
   } catch (e) {
     console.error('Failed to parse AI response:', e);
@@ -330,7 +336,7 @@ ${buildScrapedDataSummary(data)}
   "suggestions": ["建议1", "建议2", "建议3", "建议4", "建议5"]
 }
 
-checks 必须包含 8 个检查项，每个都要有深度分析。`;
+根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
 
   const raw = await callAI(systemPrompt, userPrompt);
   return parseAIResponse(raw);
@@ -401,7 +407,7 @@ ${buildScrapedDataSummary(data)}
   "suggestions": ["建议1", "建议2", "建议3", "建议4", "建议5"]
 }
 
-checks 必须包含 8 个检查项。`;
+根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
 
   const raw = await callAI(systemPrompt, userPrompt);
   return parseAIResponse(raw);
@@ -472,7 +478,7 @@ ${buildScrapedDataSummary(data)}
   "suggestions": ["建议1", "建议2", "建议3", "建议4", "建议5"]
 }
 
-checks 必须包含 8 个检查项。`;
+根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
 
   const raw = await callAI(systemPrompt, userPrompt);
   return parseAIResponse(raw);
@@ -543,7 +549,7 @@ ${buildScrapedDataSummary(data)}
   "suggestions": ["建议1", "建议2", "建议3", "建议4", "建议5"]
 }
 
-checks 必须包含 6-8 个检查项。`;
+根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
 
   const raw = await callAI(systemPrompt, userPrompt);
   return parseAIResponse(raw);
@@ -558,21 +564,397 @@ export interface FullAIAnalysis {
   seo: AICategoryResult;
   ads: AICategoryResult;
   email: AICategoryResult;
+  tech: AICategoryResult;
+  brand: AICategoryResult;
+  techSeo: AICategoryResult;    // 新增：技术SEO深度分析
+  eeat: AICategoryResult;       // 新增：E-E-A-T分析
+  geo: AICategoryResult;        // 新增：GEO/AEO分析
   scores: {
     uiux: number;
     seo: number;
     ads: number;
     email: number;
+    tech: number;
+    brand: number;
+    techSeo: number;
+    eeat: number;
+    geo: number;
     overall: number;
   };
 }
 
+async function analyzeTechPerformance(data: ScrapedData): Promise<AICategoryResult> {
+  const systemPrompt = `你是资深前端性能工程师与安全审计专家（10年经验），精通：Core Web Vitals（LCP<2.5s、FID<100ms、CLS<0.1）、Web安全（HTTPS、CSP、HSTS）、WCAG 2.1可访问性、移动端性能优化、CDN与缓存策略、代码压缩与懒加载。分析要基于Web Vitals最佳实践和安全标准。
+${SCORING_RUBRIC}`;
+
+  const userPrompt = `请以技术性能工程师的视角，对以下 DTC 品牌网站进行深度诊断：
+
+${buildScrapedDataSummary(data)}
+
+分析维度（每个都要深入评估）：
+
+1. **页面加载速度**
+   - 加载时间是否<3秒
+   - 图片是否做了懒加载和格式优化
+   - 是否有骨架屏或加载状态
+
+2. **移动端适配**
+   - Viewport配置是否正确
+   - 触控目标是否≥44px
+   - 文字在移动端是否≥16px
+
+3. **HTTPS与安全**
+   - 是否全站HTTPS
+   - 安全头部配置（HSTS、CSP等）
+   - 混合内容检查
+
+4. **技术栈分析**
+   - 使用的框架和库
+   - 是否有冗余脚本
+   - 代码压缩和优化
+
+5. **可访问性(WCAG)**
+   - 图片alt标签完整度
+   - 表单label关联
+   - 键盘导航支持
+
+6. **Core Web Vitals**
+   - LCP（最大内容绘制）优化
+   - FID（首次输入延迟）优化
+   - CLS（累积布局偏移）优化
+
+7. **CDN与缓存**
+   - 静态资源缓存策略
+   - CDN使用情况
+   - 资源压缩（Gzip/Brotli）
+
+8. **代码质量**
+   - HTML语义化
+   - CSS优化
+   - JavaScript性能
+
+请以 JSON 格式返回（不要包含其他文字）：
+{
+  "score": 0-100综合评分,
+  "summary": "一句话总结（20字内）",
+  "checks": [
+    {"label": "检查项", "score": 0-100, "feedback": "专业分析（通俗语言+专业术语，50-100字）", "suggestion": "具体可执行的改进建议（30-60字）"}
+  ],
+  "issues": ["问题1", "问题2", "问题3"],
+  "suggestions": ["建议1", "建议2", "建议3", "建议4", "建议5"]
+}
+
+根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
+
+  const raw = await callAI(systemPrompt, userPrompt);
+  return parseAIResponse(raw);
+}
+
+async function analyzeBrandStory(data: ScrapedData): Promise<AICategoryResult> {
+  const systemPrompt = `你是品牌战略总监与视觉叙事专家（12年经验），精通：品牌定位理论（特劳特定位）、品牌故事框架（英雄之旅）、视觉叙事（色彩心理学、排版情绪）、信任背书体系（媒体/奖项/认证）、情感营销、用户社区运营、DTC品牌差异化。分析要基于品牌建设和情感营销理论。
+${SCORING_RUBRIC}`;
+
+  const userPrompt = `请以品牌战略总监的视角，对以下 DTC 品牌网站进行深度诊断：
+
+${buildScrapedDataSummary(data)}
+
+分析维度（每个都要深入评估）：
+
+1. **品牌故事质量**
+   - About Us页面是否有引人入胜的品牌故事
+   - 是否有创始人故事和品牌起源
+   - 使命/愿景/价值观是否清晰传达
+
+2. **品牌调性一致性**
+   - 语言风格是否贯穿全站
+   - 品牌声音是否独特且一致
+   - 文案是否有情感共鸣
+
+3. **视觉设计层次**
+   - 色彩搭配是否符合品牌调性
+   - 排版层次是否清晰
+   - 留白运用是否得当
+
+4. **信任背书元素**
+   - 媒体报道展示
+   - 奖项和认证
+   - 合作伙伴logo
+
+5. **情感连接度**
+   - 是否能引发用户情感共鸣
+   - 用户故事和案例展示
+   - 社区感和归属感
+
+6. **品牌差异化**
+   - 与竞品的差异化是否清晰
+   - 独特卖点(USP)是否突出
+   - 品牌记忆点是否足够
+
+7. **创始人故事**
+   - 创始人背景和动机
+   - 个人故事与品牌连接
+   - 真实性和可信度
+
+8. **用户社区与UGC**
+   - 用户评价和故事展示
+   - 社交媒体整合
+   - 用户参与感
+
+请以 JSON 格式返回（不要包含其他文字）：
+{
+  "score": 0-100综合评分,
+  "summary": "一句话总结（20字内）",
+  "checks": [
+    {"label": "检查项", "score": 0-100, "feedback": "专业分析（通俗语言+专业术语，50-100字）", "suggestion": "具体可执行的改进建议（30-60字）"}
+  ],
+  "issues": ["问题1", "问题2", "问题3"],
+  "suggestions": ["建议1", "建议2", "建议3", "建议4", "建议5"]
+}
+
+根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
+
+  const raw = await callAI(systemPrompt, userPrompt);
+  return parseAIResponse(raw);
+}
+
+// ═══════════════════════════════════════════════════
+// 技术SEO深度分析 Agent — 基于 claude-seo 方法论
+// ═══════════════════════════════════════════════════
+
+async function analyzeTechSEODepth(data: ScrapedData): Promise<AICategoryResult> {
+  const systemPrompt = `你是资深技术SEO工程师（10年经验），精通：Core Web Vitals（LCP<2.5s、INP<200ms、CLS<0.1）、Schema.org结构化数据验证、Canonical标签、Robots Meta、Hreflang国际化、Open Graph/Twitter Card、移动端SEO、爬虫指令（robots.txt、sitemap）。分析要基于Google搜索文档和SEO最佳实践，给出具体可执行的技术建议。
+${SCORING_RUBRIC}`;
+
+  const userPrompt = `请以技术SEO工程师的视角，对以下 DTC 品牌网站进行深度技术诊断：
+
+${buildScrapedDataSummary(data)}
+
+分析维度（每个都要深入评估）：
+
+1. **Core Web Vitals**
+   - LCP（最大内容绘制）是否<2.5秒
+   - INP（交互到下一次绘制）是否<200毫秒
+   - CLS（累积布局偏移）是否<0.1
+   - 是否有图片懒加载、代码分割等优化
+
+2. **Schema结构化数据**
+   - 是否有Product、Organization、BreadcrumbList等Schema
+   - JSON-LD格式是否正确
+   - Schema必填字段是否完整
+   - 是否有废弃的Schema类型（HowTo、FAQ等）
+
+3. **Canonical与重复内容**
+   - 是否设置了canonical标签
+   - 是否有重复内容问题
+   - URL参数是否处理得当
+
+4. **爬虫指令**
+   - robots.txt是否配置正确
+   - 是否有noindex页面
+   - sitemap.xml是否完整
+
+5. **国际化SEO**
+   - 是否有多语言版本
+   - hreflang标签是否正确配置
+   - 是否有区域定向
+
+6. **社交分享优化**
+   - Open Graph标签是否完整
+   - Twitter Card是否配置
+   - 分享时是否显示正确的图片和描述
+
+7. **移动端SEO**
+   - 移动端是否友好
+   - 触控目标是否≥44px
+   - 是否有独立移动站或响应式
+
+8. **安全与可访问性**
+   - 是否全站HTTPS
+   - 是否有安全头部（HSTS、CSP）
+   - 图片alt标签完整度
+
+请以 JSON 格式返回（不要包含其他文字）：
+{
+  "score": 0-100综合评分,
+  "summary": "一句话总结（20字内）",
+  "checks": [
+    {"label": "检查项", "score": 0-100, "feedback": "专业分析（通俗语言+专业术语，50-100字）", "suggestion": "具体可执行的改进建议（30-60字）"}
+  ],
+  "issues": ["问题1", "问题2", "问题3"],
+  "suggestions": ["建议1", "建议2", "建议3", "建议4", "建议5"]
+}
+
+根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
+
+  const raw = await callAI(systemPrompt, userPrompt);
+  return parseAIResponse(raw);
+}
+
+// ═══════════════════════════════════════════════════
+// E-E-A-T分析 Agent — 基于 claude-seo 方法论
+// ═══════════════════════════════════════════════════
+
+async function analyzeEEATDepth(data: ScrapedData): Promise<AICategoryResult> {
+  const systemPrompt = `你是资深内容质量评估专家，精通Google搜索质量评估指南（Search Quality Rater Guidelines），精通E-E-A-T框架（Experience经验、Expertise专业性、Authoritativeness权威性、Trustworthiness可信度）。分析要基于Google的YMYL标准和E-E-A-T评估框架，给出具体可执行的改进建议。
+${SCORING_RUBRIC}`;
+
+  const userPrompt = `请以内容质量评估专家的视角，对以下 DTC 品牌网站进行E-E-A-T深度诊断：
+
+${buildScrapedDataSummary(data)}
+
+分析维度（每个都要深入评估）：
+
+1. **Experience（经验）**
+   - 是否有原创内容（非AI生成）
+   - 是否有第一手经验（用户评价、案例研究）
+   - 是否有真实的产品使用照片
+   - 内容是否有深度而非泛泛而谈
+
+2. **Expertise（专业性）**
+   - 作者是否有专业背景
+   - 内容是否展示专业知识
+   - 是否有行业认证或资质
+   - 产品描述是否专业准确
+
+3. **Authoritativeness（权威性）**
+   - 是否有外部引用和来源
+   - 是否有媒体报道或行业认可
+   - 品牌在行业内的知名度
+   - 是否有学术或专业机构背书
+
+4. **Trustworthiness（可信度）**
+   - 是否有隐私政策、服务条款
+   - 联系信息是否完整
+   - 是否有安全认证（SSL、支付安全）
+   - 退款/退货政策是否清晰
+
+5. **YMYL（Your Money Your Life）**
+   - 涉及健康、财务、安全的内容是否有专业来源
+   - 产品声明是否有科学依据
+   - 是否有免责说明
+
+6. **作者归属**
+   - 内容是否有明确的作者
+   - 作者页面是否链接到个人简介
+   - 作者是否有专业背景
+
+7. **内容新鲜度**
+   - 内容是否有发布/更新日期
+   - 是否定期更新
+   - 过时内容是否标注或删除
+
+8. **外部引用**
+   - 是否引用权威来源
+   - 引用链接是否可访问
+   - 是否有学术或行业研究引用
+
+请以 JSON 格式返回（不要包含其他文字）：
+{
+  "score": 0-100综合评分,
+  "summary": "一句话总结（20字内）",
+  "checks": [
+    {"label": "检查项", "score": 0-100, "feedback": "专业分析（通俗语言+专业术语，50-100字）", "suggestion": "具体可执行的改进建议（30-60字）"}
+  ],
+  "issues": ["问题1", "问题2", "问题3"],
+  "suggestions": ["建议1", "建议2", "建议3", "建议4", "建议5"]
+}
+
+根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
+
+  const raw = await callAI(systemPrompt, userPrompt);
+  return parseAIResponse(raw);
+}
+
+// ═══════════════════════════════════════════════════
+// GEO/AEO分析 Agent — 基于 claude-seo 方法论
+// ═══════════════════════════════════════════════════
+
+async function analyzeGEODepth(data: ScrapedData): Promise<AICategoryResult> {
+  const systemPrompt = `你是资深GEO（生成式引擎优化）专家，精通：AI搜索优化（ChatGPT、Perplexity、Google AI Overviews）、段落可引用性（134-167词独立答案块）、问题式标题层级、实体存在（Wikipedia、Reddit、YouTube、LinkedIn）、结构化数据对AI的影响、llms.txt优化。分析要基于Google AI优化指南和GEO最佳实践，给出具体可执行的优化建议。
+${SCORING_RUBRIC}`;
+
+  const userPrompt = `请以GEO优化专家的视角，对以下 DTC 品牌网站进行AI搜索优化诊断：
+
+${buildScrapedDataSummary(data)}
+
+分析维度（每个都要深入评估）：
+
+1. **FAQ/问答内容**
+   - 是否有FAQ页面
+   - 问答内容是否覆盖用户常见问题
+   - 问答格式是否结构化（Q&A格式）
+   - 是否有Schema FAQPage标记
+
+2. **段落可引用性（Passage Citability）**
+   - 内容是否有独立的答案段落（134-167词）
+   - 段落是否自包含（无需上下文即可理解）
+   - 是否有清晰的定义和解释
+   - AI能否直接提取引用
+
+3. **实体存在（Entity Presence）**
+   - 品牌在Wikipedia是否有页面
+   - 品牌在Reddit、YouTube、LinkedIn是否有提及
+   - 内容是否提及权威实体
+   - 品牌实体是否清晰
+
+4. **结构化答案**
+   - 内容是否有列表、表格等结构化格式
+   - 是否有步骤说明（Step-by-step）
+   - 是否有定义和解释
+   - AI能否提取结构化信息
+
+5. **问题式标题**
+   - 标题是否使用问句（How、What、Why）
+   - 标题是否匹配用户搜索意图
+   - 是否有How-to内容
+   - 标题层级是否清晰
+
+6. **引用密度**
+   - 内容是否有外部引用
+   - 引用来源是否权威
+   - 是否有数据和研究支持
+   - 是否有新闻报道引用
+
+7. **AI友好内容**
+   - 内容是否避免AI生成痕迹
+   - 是否有原创观点和见解
+   - 是否有第一手经验
+   - 内容是否有深度而非泛泛而谈
+
+8. **llms.txt配置**
+   - 是否有llms.txt文件
+   - llms.txt内容是否完整
+   - 是否有llms-full.txt
+   - 是否有AI爬虫指令
+
+请以 JSON 格式返回（不要包含其他文字）：
+{
+  "score": 0-100综合评分,
+  "summary": "一句话总结（20字内）",
+  "checks": [
+    {"label": "检查项", "score": 0-100, "feedback": "专业分析（通俗语言+专业术语，50-100字）", "suggestion": "具体可执行的改进建议（30-60字）"}
+  ],
+  "issues": ["问题1", "问题2", "问题3"],
+  "suggestions": ["建议1", "建议2", "建议3", "建议4", "建议5"]
+}
+
+根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
+
+  const raw = await callAI(systemPrompt, userPrompt);
+  return parseAIResponse(raw);
+}
+
 export async function runFullAIAnalysis(data: ScrapedData): Promise<FullAIAnalysis> {
-  const [uiux, seo, ads, email] = await Promise.all([
+  const [uiux, seo, ads, email, tech, brand, techSeo, eeat, geo] = await Promise.all([
     analyzeUIUX(data),
     analyzeSEO(data),
     analyzeAdsConversion(data),
     analyzeEmailMarketing(data),
+    analyzeTechPerformance(data),
+    analyzeBrandStory(data),
+    analyzeTechSEODepth(data),
+    analyzeEEATDepth(data),
+    analyzeGEODepth(data),
   ]);
 
   const scores = {
@@ -580,8 +962,13 @@ export async function runFullAIAnalysis(data: ScrapedData): Promise<FullAIAnalys
     seo: seo.score,
     ads: ads.score,
     email: email.score,
-    overall: Math.round((uiux.score + seo.score + ads.score + email.score) / 4),
+    tech: tech.score,
+    brand: brand.score,
+    techSeo: techSeo.score,
+    eeat: eeat.score,
+    geo: geo.score,
+    overall: Math.round((uiux.score + seo.score + ads.score + email.score + tech.score + brand.score + techSeo.score + eeat.score + geo.score) / 9),
   };
 
-  return { uiux, seo, ads, email, scores };
+  return { uiux, seo, ads, email, tech, brand, techSeo, eeat, geo, scores };
 }

@@ -94,25 +94,41 @@ async function callAPI(prompt) {
       return null
     }
 
-    const content = res.choices[0].message.content || ''
-    console.log('AI返回:', content.substring(0, 150))
+    // 优先使用content，如果为空则使用reasoning_content
+    const content = res.choices[0].message.content || res.choices[0].message.reasoning_content || ''
+    console.log('AI返回content:', res.choices[0].message.content?.substring(0, 100))
+    console.log('AI返回reasoning:', res.choices[0].message.reasoning_content?.substring(0, 100))
+    console.log('最终使用:', content.substring(0, 150))
 
     if (!content) {
       console.error('AI返回空内容')
       return null
     }
 
-    // 提取JSON（支持 ```json ... ``` 格式）
-    let jsonStr = content
+    // 提取JSON（支持 ```json ... ``` 格式，也支持直接JSON）
+    let jsonStr = ''
+
+    // 先尝试从content中提取
     const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/)
     if (codeBlockMatch) {
       jsonStr = codeBlockMatch[1].trim()
       console.log('从代码块提取JSON')
     } else {
+      // 尝试匹配完整的JSON对象（支持嵌套）
       const jsonMatch = content.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         jsonStr = jsonMatch[0]
         console.log('直接提取JSON')
+      }
+    }
+
+    // 如果content中没有找到JSON，尝试从reasoning_content中提取
+    if (!jsonStr && res.choices[0].message.reasoning_content) {
+      const reasoning = res.choices[0].message.reasoning_content
+      const reasoningJsonMatch = reasoning.match(/\{[\s\S]*\}/)
+      if (reasoningJsonMatch) {
+        jsonStr = reasoningJsonMatch[0]
+        console.log('从reasoning_content提取JSON')
       }
     }
 
@@ -192,25 +208,31 @@ exports.main = async (event, context) => {
     const data = await scrapeHomepage(url)
     console.log('爬取完成:', data.title)
 
-    const s = `${data.url} ${data.title} ${data.content.substring(0, 150)}`
+    const s = `${data.url} ${data.title} ${data.content.substring(0, 200)}`
 
-    // 分析 UI/UX 和 SEO
-    console.log('分析UI/UX...')
-    const uiux = await callAPI(`UI/UX评分。${s}\nJSON:{"score":0,"summary":"","checks":[],"issues":[]}`) || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }
-    console.log('UI/UX完成:', uiux.score)
+    // 一次调用返回4个维度
+    console.log('分析中...')
+    const prompt = `你是网站分析专家。根据以下信息，直接返回JSON格式评分，不要任何其他文字。
 
-    console.log('分析SEO...')
-    const seo = await callAPI(`SEO评分。${s}\nJSON:{"score":0,"summary":"","checks":[],"issues":[]}`) || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }
-    console.log('SEO完成:', seo.score)
+网站：${data.url}
+标题：${data.title}
+内容：${data.content.substring(0, 150)}
 
-    // 广告和邮件使用默认值
-    const ads = { score: 50, summary: '待分析', checks: [], issues: [], suggestions: [] }
-    const email = { score: 50, summary: '待分析', checks: [], issues: [], suggestions: [] }
+直接返回这个JSON，不要markdown，不要解释：
+{"uiux":{"score":80,"summary":"好","checks":[],"issues":[]},"seo":{"score":70,"summary":"一般","checks":[],"issues":[]},"ads":{"score":60,"summary":"待改进","checks":[],"issues":[]},"email":{"score":50,"summary":"差","checks":[],"issues":[]}}`
+
+    const result = await callAPI(prompt)
+    console.log('分析完成')
+
+    const uiux = result?.uiux || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }
+    const seo = result?.seo || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }
+    const ads = result?.ads || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }
+    const email = result?.email || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }
 
     const overall = Math.round((uiux.score + seo.score + ads.score + email.score) / 4)
 
     const db = cloud.database()
-    const result = await db.collection('reports').add({
+    const dbResult = await db.collection('reports').add({
       data: {
         url,
         timestamp: db.serverDate(),
@@ -222,7 +244,7 @@ exports.main = async (event, context) => {
 
     return {
       success: true,
-      reportId: result._id,
+      reportId: dbResult._id,
       scores: { uiux: uiux.score, seo: seo.score, ads: ads.score, email: email.score, overall },
       analysis: { uiux, seo, ads, email },
       pages: []

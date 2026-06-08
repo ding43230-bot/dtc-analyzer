@@ -6,13 +6,39 @@ export interface AnalysisResult {
     seo: number;
     ads: number;
     email: number;
+    tech: number;
+    brand: number;
     overall: number;
   };
   uiux: UIUXAnalysis;
   seo: SEOAnalysis;
   ads: AdsAnalysis;
   email: EmailAnalysis;
+  tech: TechAnalysis;
+  brand: BrandAnalysis;
   recommendations: string[];
+}
+
+export interface TechAnalysis {
+  score: number;
+  details: {
+    performance: { score: number; feedback: string };
+    security: { score: number; feedback: string };
+    accessibility: { score: number; feedback: string };
+    mobile: { score: number; feedback: string };
+  };
+  issues: string[];
+}
+
+export interface BrandAnalysis {
+  score: number;
+  details: {
+    storytelling: { score: number; feedback: string };
+    visualIdentity: { score: number; feedback: string };
+    trustSignals: { score: number; feedback: string };
+    emotionalConnection: { score: number; feedback: string };
+  };
+  issues: string[];
 }
 
 export interface UIUXAnalysis {

@@ -51,7 +51,9 @@ export interface FullAIAnalysis {
   seo: AICategoryResult;
   ads: AICategoryResult;
   email: AICategoryResult;
-  scores: { uiux: number; seo: number; ads: number; email: number; overall: number };
+  tech: AICategoryResult;
+  brand: AICategoryResult;
+  scores: { uiux: number; seo: number; ads: number; email: number; tech: number; brand: number; overall: number };
 }
 
 const SCORING_RUBRIC = `
@@ -188,41 +190,75 @@ function parseAIResponse(raw: string): AICategoryResult {
     console.error('AI returned empty response');
     return { score: 50, summary: 'AI返回空响应', checks: [], issues: ['AI未返回有效内容'], suggestions: [] };
   }
-  try {
-    const repaired = repairJSON(raw);
-    const parsed = JSON.parse(repaired);
-    return {
-      score: Math.min(100, Math.max(0, parsed.score || 0)),
-      summary: parsed.summary || '',
-      checks: (parsed.checks || []).map((c: any) => ({
-        label: c.label || '',
-        score: Math.min(100, Math.max(0, c.score || 0)),
-        feedback: c.feedback || '',
-        suggestion: c.suggestion || '',
-        ...(c.evidence ? {
-          evidence: {
-            pageUrl: c.evidence.pageUrl || '',
-            location: c.evidence.location || '',
-            selector: c.evidence.selector || '',
-          }
-        } : {}),
-      })),
-      issues: parsed.issues || [],
-      suggestions: parsed.suggestions || [],
-    };
-  } catch (e) {
-    console.error('AI response parse failed. Raw (first 500):', raw.substring(0, 500));
-    // Fallback: try to extract score from raw text
-    const scoreMatch = raw.match(/"score"\s*:\s*(\d+)/);
-    const summaryMatch = raw.match(/"summary"\s*:\s*"([^"]*)"/);
-    return {
-      score: scoreMatch ? Math.min(100, Math.max(0, parseInt(scoreMatch[1]))) : 50,
-      summary: summaryMatch ? summaryMatch[1] : '分析结果解析失败，请重试',
-      checks: [],
-      issues: ['无法解析AI分析结果'],
-      suggestions: [],
-    };
+
+  // 多次尝试解析
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const repaired = attempt === 0 ? repairJSON(raw) : repairJSON(raw.replace(/,\s*$/, ''));
+      const parsed = JSON.parse(repaired);
+      if (typeof parsed.score === 'number') {
+        const checks = (parsed.checks || []).map((c: any) => ({
+          label: c.label || '',
+          score: Math.min(100, Math.max(0, c.score || 0)),
+          feedback: c.feedback || '',
+          suggestion: c.suggestion || '',
+          ...(c.evidence ? {
+            evidence: {
+              pageUrl: c.evidence.pageUrl || '',
+              location: c.evidence.location || '',
+              selector: c.evidence.selector || '',
+            }
+          } : {}),
+        }));
+        let suggestions = parsed.suggestions || [];
+        // 如果suggestions为空，从checks的suggestion字段提取
+        if (suggestions.length === 0) {
+          suggestions = checks.filter((c: any) => c.suggestion).map((c: any) => c.suggestion);
+        }
+        return {
+          score: Math.min(100, Math.max(0, parsed.score || 0)),
+          summary: parsed.summary || '',
+          checks,
+          issues: parsed.issues || [],
+          suggestions,
+        };
+      }
+    } catch (e) {
+      if (attempt === 2) {
+        console.error('AI response parse failed after 3 attempts. Raw (first 500):', raw.substring(0, 500));
+      }
+    }
   }
+
+  // Fallback: try to extract data from raw text
+  const scoreMatch = raw.match(/"score"\s*:\s*(\d+)/);
+  const summaryMatch = raw.match(/"summary"\s*:\s*"([^"]*)"/);
+
+  // Try to extract checks from raw text
+  const checkMatches = [...raw.matchAll(/"label"\s*:\s*"([^"]*)"[^}]*?"score"\s*:\s*(\d+)[^}]*?"feedback"\s*:\s*"([^"]*)"/g)];
+  const checks = checkMatches.map(m => ({
+    label: m[1] || '',
+    score: Math.min(100, Math.max(0, parseInt(m[2]) || 0)),
+    feedback: m[3] || '',
+    suggestion: '',
+  }));
+
+  // Try to extract issues
+  const issueMatches = [...raw.matchAll(/"issues"\s*:\s*\[([^\]]*)\]/g)];
+  const issues: string[] = [];
+  if (issueMatches.length > 0) {
+    const issueStr = issueMatches[0][1];
+    const issueItems = issueStr.match(/"([^"]*)"/g);
+    if (issueItems) issues.push(...issueItems.map(s => s.replace(/"/g, '')));
+  }
+
+  return {
+    score: scoreMatch ? Math.min(100, Math.max(0, parseInt(scoreMatch[1]))) : 50,
+    summary: summaryMatch ? summaryMatch[1] : '分析结果解析失败，请重试',
+    checks: checks.length > 0 ? checks : [],
+    issues: issues.length > 0 ? issues : ['无法解析AI分析结果'],
+    suggestions: [],
+  };
 }
 
 const EVIDENCE_INSTRUCTION = `证据要求（必须严格遵守）：
@@ -247,30 +283,41 @@ async function analyzeCategory(systemPrompt: string, userPrompt: string): Promis
 export async function runClientAnalysis(data: ScrapedData, pages?: PageSummary[]): Promise<FullAIAnalysis> {
   const summary = buildScrapedDataSummary(data, pages);
 
-  const [uiux, seo, ads, email] = await Promise.all([
+  const JSON_FORMAT = `直接返回JSON，不要推理过程，不要代码块标记。格式: {"score":0-100,"summary":"综合评语(50-100字)","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}`;
+  const ANALYSIS_RULES = `你正在分析的数据包含首页和多个子页面（产品页、集合页、关于页等），请综合所有页面给出分析，不要只看首页。根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
+
+  const [uiux, seo, ads, email, tech, brand] = await Promise.all([
     analyzeCategory(
       `你是资深UI/UX设计总监。分析要深入、专业、可执行。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `对以下DTC品牌网站进行UI/UX深度诊断：\n\n${summary}\n\n分析：首屏设计、视觉层级、导航体验、响应式设计、加载性能、CTA设计、表单体验、信任设计。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}。checks必须8项。`
+      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行UI/UX深度诊断：\n\n${summary}\n\n分析：首屏设计、视觉层级、导航体验、响应式设计、加载性能、CTA设计、表单体验、信任设计。${JSON_FORMAT}`
     ),
     analyzeCategory(
       `你是资深SEO总监。分析要基于数据，给出具体技术建议。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `对以下DTC品牌网站进行SEO/GEO深度诊断：\n\n${summary}\n\n分析：Meta标签、标题层级、内容质量、结构化数据、图片SEO、内部链接、GEO优化、移动端SEO。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}。checks必须8项。`
+      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行SEO/GEO深度诊断：\n\n${summary}\n\n分析：Meta标签、标题层级、内容质量、结构化数据、图片SEO、内部链接、GEO优化、移动端SEO。${JSON_FORMAT}`
     ),
     analyzeCategory(
       `你是资深广告转化优化总监。分析要基于CRO最佳实践。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `对以下DTC品牌网站进行广告转化深度诊断：\n\n${summary}\n\n分析：价值主张、CTA设计、信任元素、社会证明、产品展示、转化路径、定价策略、结账体验。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}。checks必须8项。`
+      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行广告转化深度诊断：\n\n${summary}\n\n分析：价值主张、CTA设计、信任元素、社会证明、产品展示、转化路径、定价策略、结账体验。${JSON_FORMAT}`
     ),
     analyzeCategory(
       `你是资深邮件营销总监。分析要基于DTC邮件营销最佳实践。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `对以下DTC品牌网站进行邮件营销深度诊断：\n\n${summary}\n\n分析：邮箱捕获入口、订阅激励、线索捕获机制、邮件自动化、个性化能力、合规性、多渠道协同、生命周期营销。返回JSON: {"score":0-100,"summary":"一句话","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}。checks必须6-8项。`
+      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行邮件营销深度诊断：\n\n${summary}\n\n分析：邮箱捕获入口、订阅激励、线索捕获机制、邮件自动化、个性化能力、合规性、多渠道协同、生命周期营销。${JSON_FORMAT}`
+    ),
+    analyzeCategory(
+      `你是资深前端性能工程师与安全审计专家。分析要基于Web Vitals最佳实践和安全标准。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
+      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行技术性能深度诊断：\n\n${summary}\n\n分析：页面加载速度与性能、移动端适配质量、HTTPS与安全配置、技术栈与框架分析、可访问性(WCAG)、Core Web Vitals指标、CDN与缓存策略、代码质量与压缩。${JSON_FORMAT}`
+    ),
+    analyzeCategory(
+      `你是品牌战略总监与视觉叙事专家。分析要基于品牌建设和情感营销理论。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
+      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行品牌故事深度诊断：\n\n${summary}\n\n分析：About Us品牌故事质量、品牌调性与语言风格一致性、视觉设计层次与留白运用、信任背书元素(媒体/奖项/认证)、品牌情感连接度、品牌差异化定位清晰度、创始人故事与使命传达、用户社区与UGC展示。${JSON_FORMAT}`
     ),
   ]);
 
   return {
-    uiux, seo, ads, email,
+    uiux, seo, ads, email, tech, brand,
     scores: {
-      uiux: uiux.score, seo: seo.score, ads: ads.score, email: email.score,
-      overall: Math.round((uiux.score + seo.score + ads.score + email.score) / 4),
+      uiux: uiux.score, seo: seo.score, ads: ads.score, email: email.score, tech: tech.score, brand: brand.score,
+      overall: Math.round((uiux.score + seo.score + ads.score + email.score + tech.score + brand.score) / 6),
     },
   };
 }

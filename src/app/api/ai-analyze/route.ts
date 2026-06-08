@@ -36,6 +36,11 @@ export async function POST(request: NextRequest) {
       seo: { score: aiAnalysis.seo.score, issues: aiAnalysis.seo.issues } as any,
       ads: { score: aiAnalysis.ads.score, issues: aiAnalysis.ads.issues } as any,
       email: { score: aiAnalysis.email.score, issues: aiAnalysis.email.issues } as any,
+      tech: { score: aiAnalysis.tech.score, issues: aiAnalysis.tech.issues } as any,
+      brand: { score: aiAnalysis.brand.score, issues: aiAnalysis.brand.issues } as any,
+      techSeo: { score: aiAnalysis.techSeo.score, issues: aiAnalysis.techSeo.issues } as any,
+      eeat: { score: aiAnalysis.eeat.score, issues: aiAnalysis.eeat.issues } as any,
+      geo: { score: aiAnalysis.geo.score, issues: aiAnalysis.geo.issues } as any,
       recommendations: [] as string[],
     };
     const recommendations = matchServices(analysisForMatching);
@@ -49,6 +54,11 @@ export async function POST(request: NextRequest) {
         seo: { score: aiAnalysis.seo.score, summary: aiAnalysis.seo.summary, checks: aiAnalysis.seo.checks, issues: aiAnalysis.seo.issues, suggestions: aiAnalysis.seo.suggestions },
         ads: { score: aiAnalysis.ads.score, summary: aiAnalysis.ads.summary, checks: aiAnalysis.ads.checks, issues: aiAnalysis.ads.issues, suggestions: aiAnalysis.ads.suggestions },
         email: { score: aiAnalysis.email.score, summary: aiAnalysis.email.summary, checks: aiAnalysis.email.checks, issues: aiAnalysis.email.issues, suggestions: aiAnalysis.email.suggestions },
+        tech: { score: aiAnalysis.tech.score, summary: aiAnalysis.tech.summary, checks: aiAnalysis.tech.checks, issues: aiAnalysis.tech.issues, suggestions: aiAnalysis.tech.suggestions },
+        brand: { score: aiAnalysis.brand.score, summary: aiAnalysis.brand.summary, checks: aiAnalysis.brand.checks, issues: aiAnalysis.brand.issues, suggestions: aiAnalysis.brand.suggestions },
+        techSeo: { score: aiAnalysis.techSeo.score, summary: aiAnalysis.techSeo.summary, checks: aiAnalysis.techSeo.checks, issues: aiAnalysis.techSeo.issues, suggestions: aiAnalysis.techSeo.suggestions },
+        eeat: { score: aiAnalysis.eeat.score, summary: aiAnalysis.eeat.summary, checks: aiAnalysis.eeat.checks, issues: aiAnalysis.eeat.issues, suggestions: aiAnalysis.eeat.suggestions },
+        geo: { score: aiAnalysis.geo.score, summary: aiAnalysis.geo.summary, checks: aiAnalysis.geo.checks, issues: aiAnalysis.geo.issues, suggestions: aiAnalysis.geo.suggestions },
       },
       recommendations,
       reportUrl: `/report/${report.id}`,

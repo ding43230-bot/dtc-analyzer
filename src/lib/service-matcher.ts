@@ -68,12 +68,40 @@ export function matchServices(analysis: AnalysisResult): ServiceRecommendation[]
     });
   }
 
+  if (analysis.scores.tech < 70) {
+    recommendations.push({
+      serviceId: 'website-basic',
+      serviceName: '网站技术优化',
+      category: 'A类全案服务包',
+      price: '$2,200 USD',
+      priceCNY: '约¥15,000',
+      priority: 'medium',
+      reason: `技术性能评分较低(${analysis.scores.tech}分)，需要优化页面速度、安全性和可访问性`,
+      matchScore: 100 - analysis.scores.tech
+    });
+  }
+
+  if (analysis.scores.brand < 70) {
+    recommendations.push({
+      serviceId: 'website-basic',
+      serviceName: '品牌故事优化',
+      category: 'A类全案服务包',
+      price: '$2,200 USD',
+      priceCNY: '约¥15,000',
+      priority: 'medium',
+      reason: `品牌故事评分较低(${analysis.scores.brand}分)，需要优化品牌叙事和视觉传达`,
+      matchScore: 100 - analysis.scores.brand
+    });
+  }
+
   // If multiple issues, recommend full package
   const lowScores = [
     analysis.scores.uiux < 70,
     analysis.scores.seo < 70,
     analysis.scores.ads < 70,
-    analysis.scores.email < 70
+    analysis.scores.email < 70,
+    analysis.scores.tech < 70,
+    analysis.scores.brand < 70
   ].filter(Boolean).length;
 
   if (lowScores >= 3) {
