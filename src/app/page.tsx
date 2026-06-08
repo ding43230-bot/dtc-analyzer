@@ -124,7 +124,10 @@ export default function Home() {
 
         <div className="flex-1" />
 
-        <span className="text-xs text-[#9CA3AF] font-medium tracking-wide">DTC品牌网站分析工具</span>
+        <div className="flex items-center gap-6">
+          <a href="/" className="text-sm text-[#F97316] font-semibold">DTC分析</a>
+          <a href="/seo" className="text-sm text-[#6B7280] hover:text-[#F97316] transition-colors">SEO分析</a>
+        </div>
       </nav>
 
       {/* ── HERO ── */}
