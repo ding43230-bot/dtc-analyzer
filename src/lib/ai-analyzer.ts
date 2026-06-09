@@ -121,7 +121,7 @@ function buildScrapedDataSummary(data: ScrapedData): string {
 - 邮箱输入框: ${emailInputs ? '有' : '无'}
 
 ## 页面内容（前1500字）
-${data.content.substring(0, 1500)}
+${(data.content || '').substring(0, 1500) || '无内容'}
 
 ## 脚本引用（前10个）
 ${scripts.slice(0, 10).join('\n') || '无'}
@@ -721,7 +721,7 @@ ${buildScrapedDataSummary(data)}
 // 技术SEO深度分析 Agent — 基于 claude-seo 方法论
 // ═══════════════════════════════════════════════════
 
-async function analyzeTechSEODepth(data: ScrapedData): Promise<AICategoryResult> {
+export async function analyzeTechSEODepth(data: ScrapedData): Promise<AICategoryResult> {
   const systemPrompt = `你是资深技术SEO工程师（10年经验），精通：Core Web Vitals（LCP<2.5s、INP<200ms、CLS<0.1）、Schema.org结构化数据验证、Canonical标签、Robots Meta、Hreflang国际化、Open Graph/Twitter Card、移动端SEO、爬虫指令（robots.txt、sitemap）。分析要基于Google搜索文档和SEO最佳实践，给出具体可执行的技术建议。
 ${SCORING_RUBRIC}`;
 
@@ -794,7 +794,7 @@ ${buildScrapedDataSummary(data)}
 // E-E-A-T分析 Agent — 基于 claude-seo 方法论
 // ═══════════════════════════════════════════════════
 
-async function analyzeEEATDepth(data: ScrapedData): Promise<AICategoryResult> {
+export async function analyzeEEATDepth(data: ScrapedData): Promise<AICategoryResult> {
   const systemPrompt = `你是资深内容质量评估专家，精通Google搜索质量评估指南（Search Quality Rater Guidelines），精通E-E-A-T框架（Experience经验、Expertise专业性、Authoritativeness权威性、Trustworthiness可信度）。分析要基于Google的YMYL标准和E-E-A-T评估框架，给出具体可执行的改进建议。
 ${SCORING_RUBRIC}`;
 
@@ -869,7 +869,7 @@ ${buildScrapedDataSummary(data)}
 // GEO/AEO分析 Agent — 基于 claude-seo 方法论
 // ═══════════════════════════════════════════════════
 
-async function analyzeGEODepth(data: ScrapedData): Promise<AICategoryResult> {
+export async function analyzeGEODepth(data: ScrapedData): Promise<AICategoryResult> {
   const systemPrompt = `你是资深GEO（生成式引擎优化）专家，精通：AI搜索优化（ChatGPT、Perplexity、Google AI Overviews）、段落可引用性（134-167词独立答案块）、问题式标题层级、实体存在（Wikipedia、Reddit、YouTube、LinkedIn）、结构化数据对AI的影响、llms.txt优化。分析要基于Google AI优化指南和GEO最佳实践，给出具体可执行的优化建议。
 ${SCORING_RUBRIC}`;
 
