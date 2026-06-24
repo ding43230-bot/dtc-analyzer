@@ -4,9 +4,9 @@ export async function POST(request: NextRequest) {
   try {
     const { messages, temperature = 0.2, max_tokens = 8000 } = await request.json();
 
-    const apiBase = process.env.NEXT_PUBLIC_MIMO_API_BASE;
-    const apiKey = process.env.NEXT_PUBLIC_MIMO_API_KEY;
-    const model = process.env.NEXT_PUBLIC_MIMO_MODEL || 'mimo-v2.5-pro';
+    const apiBase = process.env.NEXT_PUBLIC_MIMO_API_BASE || process.env.MIMO_API_BASE || 'https://token-plan-cn.xiaomimimo.com/anthropic';
+    const apiKey = process.env.NEXT_PUBLIC_MIMO_API_KEY || process.env.MIMO_API_KEY || 'tp-cv59ptcxss837h9wl8xdm92riacjkggpp0m45m9m27al48d0';
+    const model = process.env.NEXT_PUBLIC_MIMO_MODEL || process.env.MIMO_MODEL || 'mimo-v2.5-pro';
 
     if (!apiBase || !apiKey) {
       return NextResponse.json({ error: 'API not configured', hasBase: !!apiBase, hasKey: !!apiKey }, { status: 500 });
