@@ -89,18 +89,13 @@ function buildScrapedDataSummary(data: ScrapedData, pages?: PageSummary[]): stri
 URL: ${data.url}
 标题: ${data.title || '无'}
 Meta描述: ${data.description || '无'}
-加载时间: ${data.loadTime}ms
-Viewport: ${metaTags.viewport ? '已配置' : '缺失'}
-OG标签: ${metaTags.ogTitle ? '已配置' : '缺失'}
-结构化数据: ${structuredData.length > 0 ? '已配置(' + structuredData.length + '项)' : '缺失'}
 H1(${h1s.length}): ${h1s.join(' | ') || '无'}
 H2(${h2s.length}): ${h2s.join(' | ') || '无'}
 图片: ${images.length}张(无alt: ${imagesWithoutAlt}张)
 内部链接: ${internalLinks.length}个, 外部链接: ${externalLinks.length}个
 表单: ${forms.length}个, 邮箱输入: ${emailInputs ? '有' : '无'}
-主要链接(前15): ${links.slice(0, 15).map(l => `${l.text || '(无文字)'} -> ${l.href}`).join('\n  ')}
-主要图片(前5): ${images.slice(0, 5).map(i => `src=${i.src}, alt=${i.alt || '(无alt)'}`).join('\n  ')}
-内容(前1500字): ${data.content.substring(0, 1500)}`;
+主要链接(前10): ${links.slice(0, 10).map(l => `${l.text || '(无文字)'} -> ${l.href}`).join('\n  ')}
+内容(前800字): ${data.content.substring(0, 800)}`;
 
   if (pages && pages.length > 0) {
     for (const p of pages) {
@@ -111,9 +106,8 @@ H2(${h2s.length}): ${h2s.join(' | ') || '无'}
 URL: ${p.url}
 标题: ${p.title || '无'}
 H1: ${p.h1 || '无'}
-H2/H3: ${p.headings || '无'}
-图片: ${p.images.length}张, 表单: ${p.forms.length}个, 邮箱输入: ${emailInPage ? '有' : '无'}
-内容(前500字): ${p.content.substring(0, 500)}`;
+图片: ${p.images.length}张, 表单: ${p.forms.length}个
+内容(前300字): ${p.content.substring(0, 300)}`;
     }
   }
 
