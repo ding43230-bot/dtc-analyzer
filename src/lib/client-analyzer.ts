@@ -56,17 +56,7 @@ export interface FullAIAnalysis {
   scores: { uiux: number; seo: number; ads: number; email: number; tech: number; brand: number; overall: number };
 }
 
-const SCORING_RUBRIC = `
-## 评分标准（必须严格遵守）
-每个检查项和综合评分必须按照以下标准打分：
-| 分数段 | 等级 | 含义 |
-|--------|------|------|
-| 0-20 | 极差 | 该能力几乎缺失 |
-| 21-40 | 较差 | 严重不足 |
-| 41-60 | 一般 | 基础水平 |
-| 61-80 | 良好 | 达到行业标准 |
-| 81-100 | 优秀 | 超越行业水平 |
-`;
+const SCORING_RUBRIC = `评分: 0-20极差, 21-40较差, 41-60一般, 61-80良好, 81-100优秀。`;
 
 function buildScrapedDataSummary(data: ScrapedData, pages?: PageSummary[]): string {
   const headings = data.headings || [];
@@ -260,11 +250,7 @@ function parseAIResponse(raw: string): AICategoryResult {
   };
 }
 
-const EVIDENCE_INSTRUCTION = `证据要求（必须严格遵守）：
-- pageUrl：必须使用"主要链接"中列出的具体内链URL，禁止全部使用首页URL。例如：产品相关问题→用产品详情页链接，导航问题→用首页，表单/订阅问题→用包含表单的页面链接。不同检查项应指向不同页面，体现问题的具体位置。
-- location：中文描述问题位置，如"产品详情页-购买按钮"、"页脚Newsletter表单"、"集合页-筛选器"。
-- selector：CSS选择器，用于在页面上高亮问题元素。例如"nav .menu-toggle"、"footer input[type='email']"、".product-card .add-to-cart"、"#hero .cta-button"。选择器要具体到能定位到唯一元素。
-- 禁止所有checks的pageUrl都相同。每个check必须指向最相关的具体页面。`;
+const EVIDENCE_INSTRUCTION = `evidence要求: pageUrl用具体内链(非首页), location用中文描述位置, selector用CSS选择器。`;
 
 async function analyzeCategory(systemPrompt: string, userPrompt: string): Promise<AICategoryResult> {
   try {
@@ -282,35 +268,33 @@ async function analyzeCategory(systemPrompt: string, userPrompt: string): Promis
 export async function runClientAnalysis(data: ScrapedData, pages?: PageSummary[]): Promise<FullAIAnalysis> {
   const summary = buildScrapedDataSummary(data, pages);
 
-  const JSON_FORMAT = `【重要】不要使用thinking/思考模式，直接输出最终JSON结果。不要代码块标记。格式: {"score":0-100,"summary":"综合评语(50-100字)","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}`;
-  const ANALYSIS_RULES = `你正在分析的数据包含首页和多个子页面（产品页、集合页、关于页等），请综合所有页面给出分析，不要只看首页。根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
+  const JSON_FORMAT = `【重要】不要thinking，直接输出JSON。格式: {"score":0-100,"summary":"评语","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}`;
+  const ANALYSIS_RULES = `综合所有页面分析，如实评估，发现问题就写checks，有建议就写suggestions。`;
 
-  const [uiux, seo, ads, email, tech, brand] = await Promise.all([
-    analyzeCategory(
-      `你是资深UI/UX设计总监。分析要深入、专业、可执行。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行UI/UX深度诊断：\n\n${summary}\n\n分析：首屏设计、视觉层级、导航体验、响应式设计、加载性能、CTA设计、表单体验、信任设计。${JSON_FORMAT}`
-    ),
-    analyzeCategory(
-      `你是资深SEO总监。分析要基于数据，给出具体技术建议。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行SEO/GEO深度诊断：\n\n${summary}\n\n分析：Meta标签、标题层级、内容质量、结构化数据、图片SEO、内部链接、GEO优化、移动端SEO。${JSON_FORMAT}`
-    ),
-    analyzeCategory(
-      `你是资深广告转化优化总监。分析要基于CRO最佳实践。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行广告转化深度诊断：\n\n${summary}\n\n分析：价值主张、CTA设计、信任元素、社会证明、产品展示、转化路径、定价策略、结账体验。${JSON_FORMAT}`
-    ),
-    analyzeCategory(
-      `你是资深邮件营销总监。分析要基于DTC邮件营销最佳实践。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行邮件营销深度诊断：\n\n${summary}\n\n分析：邮箱捕获入口、订阅激励、线索捕获机制、邮件自动化、个性化能力、合规性、多渠道协同、生命周期营销。${JSON_FORMAT}`
-    ),
-    analyzeCategory(
-      `你是资深前端性能工程师与安全审计专家。分析要基于Web Vitals最佳实践和安全标准。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行技术性能深度诊断：\n\n${summary}\n\n分析：页面加载速度与性能、移动端适配质量、HTTPS与安全配置、技术栈与框架分析、可访问性(WCAG)、Core Web Vitals指标、CDN与缓存策略、代码质量与压缩。${JSON_FORMAT}`
-    ),
-    analyzeCategory(
-      `你是品牌战略总监与视觉叙事专家。分析要基于品牌建设和情感营销理论。${SCORING_RUBRIC}\n${EVIDENCE_INSTRUCTION}`,
-      `${ANALYSIS_RULES}\n\n对以下DTC品牌网站进行品牌故事深度诊断：\n\n${summary}\n\n分析：About Us品牌故事质量、品牌调性与语言风格一致性、视觉设计层次与留白运用、信任背书元素(媒体/奖项/认证)、品牌情感连接度、品牌差异化定位清晰度、创始人故事与使命传达、用户社区与UGC展示。${JSON_FORMAT}`
-    ),
-  ]);
+  const uiux = await analyzeCategory(
+    `你是UI/UX设计总监。${SCORING_RUBRIC} ${EVIDENCE_INSTRUCTION}`,
+    `${ANALYSIS_RULES}\n\nDTC品牌网站UI/UX诊断：\n\n${summary}\n\n分析：首屏设计、视觉层级、导航、响应式、加载、CTA、表单、信任。${JSON_FORMAT}`
+  );
+  const seo = await analyzeCategory(
+    `你是SEO总监。${SCORING_RUBRIC} ${EVIDENCE_INSTRUCTION}`,
+    `${ANALYSIS_RULES}\n\nDTC品牌网站SEO诊断：\n\n${summary}\n\n分析：Meta标签、标题层级、内容、结构化数据、图片SEO、内部链接、GEO、移动端SEO。${JSON_FORMAT}`
+  );
+  const ads = await analyzeCategory(
+    `你是广告转化优化总监。${SCORING_RUBRIC} ${EVIDENCE_INSTRUCTION}`,
+    `${ANALYSIS_RULES}\n\nDTC品牌网站广告转化诊断：\n\n${summary}\n\n分析：价值主张、CTA、信任元素、社会证明、产品展示、转化路径、定价、结账。${JSON_FORMAT}`
+  );
+  const email = await analyzeCategory(
+    `你是邮件营销总监。${SCORING_RUBRIC} ${EVIDENCE_INSTRUCTION}`,
+    `${ANALYSIS_RULES}\n\nDTC品牌网站邮件营销诊断：\n\n${summary}\n\n分析：邮箱捕获、订阅激励、线索机制、自动化、个性化、合规性、多渠道、生命周期。${JSON_FORMAT}`
+  );
+  const tech = await analyzeCategory(
+    `你是前端性能工程师。${SCORING_RUBRIC} ${EVIDENCE_INSTRUCTION}`,
+    `${ANALYSIS_RULES}\n\nDTC品牌网站技术性能诊断：\n\n${summary}\n\n分析：加载速度、移动端、HTTPS安全、技术栈、可访问性、Core Web Vitals、CDN缓存、代码质量。${JSON_FORMAT}`
+  );
+  const brand = await analyzeCategory(
+    `你是品牌战略总监。${SCORING_RUBRIC} ${EVIDENCE_INSTRUCTION}`,
+    `${ANALYSIS_RULES}\n\nDTC品牌网站品牌故事诊断：\n\n${summary}\n\n分析：品牌故事、调性一致性、视觉留白、信任背书、情感连接、差异化定位、创始人使命、UGC。${JSON_FORMAT}`
+  );
 
   return {
     uiux, seo, ads, email, tech, brand,
