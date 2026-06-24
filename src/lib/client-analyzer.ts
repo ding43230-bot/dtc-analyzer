@@ -126,25 +126,38 @@ async function callProxy(messages: Array<{role: string; content: string}>): Prom
     const apiKey = process.env.NEXT_PUBLIC_MIMO_API_KEY;
     const model = process.env.NEXT_PUBLIC_MIMO_MODEL || 'mimo-v2.5-pro';
 
-    const res = await fetch(`${apiBase}/chat/completions`, {
+    // Extract system message and user messages (Anthropic format)
+    const systemMsg = messages.find(m => m.role === 'system')?.content || '';
+    const userMsgs = messages.filter(m => m.role !== 'system').map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    const res = await fetch(`${apiBase}/v1/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'x-api-key': apiKey || '',
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
         model,
-        messages,
-        temperature: 0.2,
         max_tokens: 8000,
+        system: systemMsg,
+        messages: userMsgs,
       }),
     });
+
     if (!res.ok) {
-      console.error('MiMo API error:', res.status);
+      const errText = await res.text().catch(() => '');
+      console.error('MiMo API error:', res.status, errText.substring(0, 200));
       return '';
     }
+
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || '';
+    // Anthropic format: content is an array of blocks
+    const textBlock = data.content?.find((b: any) => b.type === 'text');
+    return textBlock?.text || '';
   } catch (e: any) {
     console.error('API call failed:', e?.message);
     return '';

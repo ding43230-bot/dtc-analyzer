@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { runClientAnalysis } from '@/lib/client-analyzer';
 import { matchServices } from '@/lib/service-matcher';
+import { gsap, ScrollTrigger } from '@/lib/gsap';
+import { useGsapReveal, useGsapStagger, useGsapMagnetic, useGsapParallax } from '@/lib/useGsap';
 
 export default function Home() {
   const [url, setUrl] = useState('');
@@ -11,6 +13,55 @@ export default function Home() {
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
   const router = useRouter();
+
+  // GSAP refs
+  const heroTitleRef = useRef<HTMLHeadingElement>(null);
+  const heroSubtitleRef = useRef<HTMLParagraphElement>(null);
+  const heroInputRef = useRef<HTMLDivElement>(null);
+  const dashboardRef = useGsapMagnetic(0.05);
+  const featuresRef = useGsapStagger({ y: 60, stagger: 0.15 });
+  const floatingOrb1 = useRef<HTMLDivElement>(null);
+  const floatingOrb2 = useRef<HTMLDivElement>(null);
+  const floatingOrb3 = useRef<HTMLDivElement>(null);
+
+  // Hero entrance animation
+  useEffect(() => {
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+    // Floating orbs continuous animation
+    [floatingOrb1, floatingOrb2, floatingOrb3].forEach((orb, i) => {
+      if (orb.current) {
+        gsap.to(orb.current, {
+          y: `random(-30, 30)`,
+          x: `random(-20, 20)`,
+          rotation: `random(-15, 15)`,
+          duration: 3 + i * 0.5,
+          repeat: -1,
+          yoyo: true,
+          ease: 'sine.inOut',
+        });
+      }
+    });
+
+    // Hero content entrance
+    tl.fromTo('.hero-badge', { opacity: 0, y: 20, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.6 })
+      .fromTo(heroTitleRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.8 }, '-=0.3')
+      .fromTo(heroSubtitleRef.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6 }, '-=0.4')
+      .fromTo(heroInputRef.current, { opacity: 0, y: 20, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.6 }, '-=0.3')
+      .fromTo('.example-btn', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.08 }, '-=0.2')
+      .fromTo('.dashboard-anim', { opacity: 0, x: 60, rotateY: -15 }, { opacity: 1, x: 0, rotateY: 0, duration: 1 }, '-=0.8');
+
+    // Features section scroll trigger
+    gsap.fromTo('.features-title', { opacity: 0, y: 30 }, {
+      opacity: 1, y: 0, duration: 0.8,
+      scrollTrigger: { trigger: '.features-title', start: 'top 85%', once: true },
+    });
+
+    return () => {
+      tl.kill();
+      ScrollTrigger.getAll().forEach(st => st.kill());
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +88,6 @@ export default function Home() {
     setProgress('正在爬取网站数据...');
 
     try {
-      // Step 1: Scrape
       const scrapeRes = await fetch('/api/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -58,7 +108,6 @@ export default function Home() {
         return;
       }
 
-      // Step 2: Client-side AI Analysis (no server timeout)
       setProgress('正在AI深度分析（UI/UX专家）...');
 
       const { homepage, pages } = scrapeData.data;
@@ -114,16 +163,23 @@ export default function Home() {
     'https://www.rothys.com',
   ];
 
+  const features = [
+    { title: 'UI/UX 分析', desc: '页面设计、用户体验、响应式布局和加载速度', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg> },
+    { title: 'SEO/GEO 分析', desc: 'Meta标签、关键词、结构化数据和AI搜索优化', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> },
+    { title: '广告转化分析', desc: '落地页质量、CTA设计、转化路径和信任元素', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg> },
+    { title: '邮件营销分析', desc: '订阅入口、邮件捕获机制和自动化流程', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> },
+    { title: '技术性能分析', desc: '页面速度、安全性、可访问性和Core Web Vitals', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg> },
+    { title: '品牌故事分析', desc: '品牌叙事、视觉调性、信任背书和情感连接', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg> },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8F9FA]">
+    <div className="min-h-screen flex flex-col bg-[#F8F9FA] overflow-hidden">
       {/* ── NAVBAR ── */}
-      <nav className="bg-white border-b border-gray-200 h-[62px] flex items-center px-[52px] sticky top-0 z-50 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
+      <nav className="bg-white/80 backdrop-blur-xl border-b border-gray-200 h-[62px] flex items-center px-[52px] sticky top-0 z-50 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
         <a href="/" className="flex items-center gap-2 no-nowrap">
           <img src="/company-logo.png" alt="NextLeap" className="h-9 w-auto object-contain" />
         </a>
-
         <div className="flex-1" />
-
         <div className="flex items-center gap-6">
           <a href="/" className="text-sm text-[#F97316] font-semibold">DTC分析</a>
           <a href="/seo" className="text-sm text-[#6B7280] hover:text-[#F97316] transition-colors">SEO分析</a>
@@ -131,11 +187,16 @@ export default function Home() {
       </nav>
 
       {/* ── HERO ── */}
-      <section className="max-w-[1200px] mx-auto px-[52px] py-[70px] pb-20 grid grid-cols-[44%_56%] gap-12 items-center min-h-[calc(100vh-62px)]">
+      <section className="relative max-w-[1200px] mx-auto px-[52px] py-[70px] pb-20 grid grid-cols-[44%_56%] gap-12 items-center min-h-[calc(100vh-62px)]">
+        {/* Floating orbs */}
+        <div ref={floatingOrb1} className="absolute top-[10%] left-[5%] w-[120px] h-[120px] rounded-full bg-gradient-to-br from-orange-300/30 to-amber-200/20 blur-2xl pointer-events-none" />
+        <div ref={floatingOrb2} className="absolute top-[60%] right-[15%] w-[80px] h-[80px] rounded-full bg-gradient-to-br from-orange-400/20 to-rose-300/15 blur-2xl pointer-events-none" />
+        <div ref={floatingOrb3} className="absolute bottom-[15%] left-[30%] w-[100px] h-[100px] rounded-full bg-gradient-to-br from-amber-200/25 to-orange-100/15 blur-2xl pointer-events-none" />
+
         {/* LEFT */}
-        <div className="flex flex-col gap-6 animate-fade-in-up">
+        <div className="flex flex-col gap-6 relative z-10">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full py-1 px-3.5 text-[12.5px] text-[#6B7280] w-fit shadow-[0_1px_4px_rgba(0,0,0,0.07)] font-medium">
+          <div className="hero-badge inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full py-1 px-3.5 text-[12.5px] text-[#6B7280] w-fit shadow-[0_1px_4px_rgba(0,0,0,0.07)] font-medium opacity-0">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>
             </svg>
@@ -143,64 +204,69 @@ export default function Home() {
           </div>
 
           {/* Title */}
-          <h1 className="text-[52px] font-black leading-[1.08] text-[#111827] tracking-[-2px]">
+          <h1 ref={heroTitleRef} className="text-[52px] font-black leading-[1.08] text-[#111827] tracking-[-2px] opacity-0">
             让你的 DTC 品牌网站
             <br />
-            <span className="text-[#F97316]">脱颖而出</span>
+            <span className="text-[#F97316] relative">
+              脱颖而出
+              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 8" preserveAspectRatio="none">
+                <path d="M0,5 Q50,0 100,5 T200,5" fill="none" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" className="hero-underline" />
+              </svg>
+            </span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-[15px] text-[#6B7280] leading-[1.8] max-w-[430px]">
+          <p ref={heroSubtitleRef} className="text-[15px] text-[#6B7280] leading-[1.8] max-w-[430px] opacity-0">
             输入网址，AI 自动分析网站在 UI/UX、SEO、广告转化、邮件营销、技术性能、品牌故事六大维度的表现，获取专业优化建议
           </p>
 
           {/* Search Box */}
-          <form onSubmit={handleSubmit}>
-            <div className="flex items-center bg-white border-[1.5px] border-gray-200 rounded-[11px] p-1.5 pl-3.5 max-w-[440px] shadow-[0_2px_10px_rgba(0,0,0,0.07)] transition-all focus-within:border-[#F97316] focus-within:shadow-[0_2px_14px_rgba(249,115,22,0.18)]">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2.5 shrink-0">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-              </svg>
-              <input
-                type="text"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="网站网址"
-                className="flex-1 border-none outline-none text-sm text-[#111827] bg-transparent font-normal placeholder:text-[#C0C6D0]"
-                disabled={loading}
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="bg-[#F97316] text-white border-none px-4 py-2 rounded-lg text-[13.5px] font-bold cursor-pointer whitespace-nowrap transition-colors hover:bg-[#EA6C0A] shrink-0 disabled:opacity-60"
-              >
-                {loading ? progress || '分析中...' : '免费分析'}
-              </button>
-            </div>
-            {error && <p className="mt-2 text-sm text-red-500 ml-1">{error}</p>}
-          </form>
+          <div ref={heroInputRef} className="opacity-0">
+            <form onSubmit={handleSubmit}>
+              <div className="flex items-center bg-white border-[1.5px] border-gray-200 rounded-[11px] p-1.5 pl-3.5 max-w-[440px] shadow-[0_2px_10px_rgba(0,0,0,0.07)] transition-all focus-within:border-[#F97316] focus-within:shadow-[0_2px_14px_rgba(249,115,22,0.18)]">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2.5 shrink-0">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+                <input
+                  type="text"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="网站网址"
+                  className="flex-1 border-none outline-none text-sm text-[#111827] bg-transparent font-normal placeholder:text-[#C0C6D0]"
+                  disabled={loading}
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-[#F97316] text-white border-none px-4 py-2 rounded-lg text-[13.5px] font-bold cursor-pointer whitespace-nowrap transition-all hover:bg-[#EA6C0A] hover:scale-[1.02] active:scale-[0.98] shrink-0 disabled:opacity-60"
+                >
+                  {loading ? progress || '分析中...' : '免费分析'}
+                </button>
+              </div>
+              {error && <p className="mt-2 text-sm text-red-500 ml-1">{error}</p>}
+            </form>
+          </div>
 
           {/* Example URLs */}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-gray-400">试试：</span>
-            {exampleUrls.map((u) => (
+            {exampleUrls.map((u, i) => (
               <button
                 key={u}
                 onClick={() => setUrl(u)}
-                className="px-3 py-1 text-sm text-[#6B7280] bg-white rounded-lg border border-gray-200 hover:border-[#F97316] hover:text-[#F97316] transition-colors cursor-pointer"
+                className="example-btn px-3 py-1 text-sm text-[#6B7280] bg-white rounded-lg border border-gray-200 hover:border-[#F97316] hover:text-[#F97316] hover:shadow-sm transition-all cursor-pointer opacity-0"
               >
                 {u.replace('https://www.', '')}
               </button>
             ))}
           </div>
-
         </div>
 
         {/* RIGHT: Dashboard Card */}
-        <div className="flex justify-end relative animate-slide-in-right delay-200">
-          <div className="w-full max-w-[570px] relative">
+        <div className="flex justify-end relative z-10">
+          <div className="w-full max-w-[570px] relative dashboard-anim opacity-0" ref={dashboardRef as any}>
             <div className="dashboard-card bg-white rounded-[18px] shadow-[0_30px_70px_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.1)] overflow-hidden">
-
               {/* Top bar */}
               <div className="bg-[#1F2937] px-4 py-2.5 flex items-center gap-2.5">
                 <div className="flex gap-[5px]">
@@ -230,9 +296,7 @@ export default function Home() {
                     <div
                       key={i}
                       className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
-                        item.active
-                          ? 'bg-[#F97316] text-white'
-                          : 'text-[#6B7280] hover:bg-[#374151] hover:text-gray-300'
+                        item.active ? 'bg-[#F97316] text-white' : 'text-[#6B7280] hover:bg-[#374151] hover:text-gray-300'
                       }`}
                     >
                       {item.svg}
@@ -242,7 +306,6 @@ export default function Home() {
 
                 {/* Main content */}
                 <div className="flex-1 bg-gray-100 overflow-y-auto p-2.5 flex flex-col gap-2">
-                  {/* Row 1: Site Overview + Page Group Insights */}
                   <div className="grid grid-cols-2 gap-2">
                     {/* Site Overview */}
                     <div className="bg-white rounded-[10px] p-3 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
@@ -298,8 +361,6 @@ export default function Home() {
                         <div className="text-[11px] font-extrabold text-[#111827] tracking-[-0.2px]">分析维度</div>
                         <a href="#" className="text-[9px] text-[#C0C6D0] no-underline whitespace-nowrap hover:text-[#F97316]">View report &gt;</a>
                       </div>
-
-                      {/* UI/UX */}
                       <div className="mb-2">
                         <div className="text-[10px] font-bold text-[#111827] mb-1.5">UI/UX 设计</div>
                         <div className="flex items-start gap-2">
@@ -325,8 +386,6 @@ export default function Home() {
                           </div>
                         </div>
                       </div>
-
-                      {/* SEO */}
                       <div>
                         <div className="text-[10px] font-bold text-[#111827] mb-1.5">SEO 优化</div>
                         <div className="flex items-start gap-2">
@@ -355,7 +414,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Row 2: Backlinks + Top Keywords */}
+                  {/* Row 2 */}
                   <div className="grid grid-cols-[1.15fr_0.85fr] gap-2">
                     {/* Conversion Overview */}
                     <div className="bg-white rounded-[10px] p-3 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
@@ -379,7 +438,6 @@ export default function Home() {
                           </div>
                         ))}
                       </div>
-                      {/* Sparkline */}
                       <svg width="100%" height="56" viewBox="0 0 220 56" preserveAspectRatio="none">
                         <line x1="0" y1="14" x2="220" y2="14" stroke="#F0F0F0" strokeWidth="1"/>
                         <line x1="0" y1="28" x2="220" y2="28" stroke="#F0F0F0" strokeWidth="1"/>
@@ -441,20 +499,15 @@ export default function Home() {
       {/* ── FEATURES ── */}
       <section className="border-t border-gray-200 bg-white py-20">
         <div className="max-w-[1200px] mx-auto px-[52px]">
-          <h2 className="text-3xl font-bold text-[#111827] tracking-tight text-center mb-3">全方位诊断</h2>
-          <p className="text-[#6B7280] text-center max-w-xl mx-auto mb-12">从设计体验到营销转化，一站式发现网站的所有问题</p>
+          <div className="features-title text-center mb-12 opacity-0">
+            <h2 className="text-3xl font-bold text-[#111827] tracking-tight mb-3">全方位诊断</h2>
+            <p className="text-[#6B7280] max-w-xl mx-auto">从设计体验到营销转化，一站式发现网站的所有问题</p>
+          </div>
 
-          <div className="grid grid-cols-3 gap-5">
-            {[
-              { title: 'UI/UX 分析', desc: '页面设计、用户体验、响应式布局和加载速度', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg> },
-              { title: 'SEO/GEO 分析', desc: 'Meta标签、关键词、结构化数据和AI搜索优化', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> },
-              { title: '广告转化分析', desc: '落地页质量、CTA设计、转化路径和信任元素', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg> },
-              { title: '邮件营销分析', desc: '订阅入口、邮件捕获机制和自动化流程', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> },
-              { title: '技术性能分析', desc: '页面速度、安全性、可访问性和Core Web Vitals', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg> },
-              { title: '品牌故事分析', desc: '品牌叙事、视觉调性、信任背书和情感连接', svg: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg> },
-            ].map((f, i) => (
-              <div key={f.title} className="bg-[#F8F9FA] rounded-xl p-6 border border-gray-100 hover:border-[#F97316] hover:shadow-md transition-all cursor-default animate-fade-in-up" style={{ animationDelay: `${0.2 + i * 0.1}s` }}>
-                <div className="w-11 h-11 rounded-lg bg-orange-50 flex items-center justify-center mb-4">{f.svg}</div>
+          <div ref={featuresRef} className="grid grid-cols-3 gap-5">
+            {features.map((f) => (
+              <div key={f.title} className="group bg-[#F8F9FA] rounded-xl p-6 border border-gray-100 hover:border-[#F97316] hover:shadow-lg hover:shadow-orange-100/50 transition-all cursor-default">
+                <div className="w-11 h-11 rounded-lg bg-orange-50 group-hover:bg-orange-100 flex items-center justify-center mb-4 transition-colors">{f.svg}</div>
                 <h3 className="font-semibold text-[#111827] mb-2">{f.title}</h3>
                 <p className="text-sm text-[#6B7280] leading-relaxed">{f.desc}</p>
               </div>

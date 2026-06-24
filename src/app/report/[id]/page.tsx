@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { gsap, ScrollTrigger } from '@/lib/gsap';
 
 // SVG Icons
 const Icons = {
@@ -159,6 +160,7 @@ function EvidenceButton({ evidence }: { evidence: NonNullable<CheckItem['evidenc
   const [useFallback, setUseFallback] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const screenshotUrl = useFallback ? getFallbackScreenshotUrl(evidence.pageUrl) : getScreenshotUrl(evidence.pageUrl);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   const openModal = useCallback(async () => {
     setShowModal(true);
@@ -176,7 +178,6 @@ function EvidenceButton({ evidence }: { evidence: NonNullable<CheckItem['evidenc
       clearTimeout(timeout);
       if (!res.ok) throw new Error('fetch failed');
       const html = await res.text();
-      // Validate we got real HTML content
       if (!html || html.length < 100 || (!html.includes('<html') && !html.includes('<HTML') && !html.includes('<body'))) {
         throw new Error('invalid html');
       }
@@ -196,11 +197,18 @@ document.addEventListener('DOMContentLoaded', function() {
       const injected = html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}${hlCss}${hlScript}`);
       setSrcdoc(injected);
     } catch {
-      setSrcdoc(null); // Falls back to screenshot
+      setSrcdoc(null);
     } finally {
       setLoading(false);
     }
   }, [evidence.pageUrl, evidence.selector]);
+
+  // GSAP modal animation
+  useEffect(() => {
+    if (showModal && modalRef.current) {
+      gsap.fromTo(modalRef.current, { opacity: 0, scale: 0.95, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 0.3, ease: 'power3.out' });
+    }
+  }, [showModal]);
 
   return (
     <div className="mt-2 flex items-start gap-2">
@@ -231,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
       </button>
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowModal(false)}>
-          <div className="relative w-[90vw] max-w-5xl h-[85vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div ref={modalRef} className="relative w-[90vw] max-w-5xl h-[85vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b shrink-0">
               <div className="flex items-center gap-3">
                 <span className="text-xs text-gray-500">{evidence.location}</span>
@@ -273,9 +281,9 @@ document.addEventListener('DOMContentLoaded', function() {
                       className="w-full h-auto"
                       onError={() => {
                         if (!useFallback) {
-                          setUseFallback(true); // Try fallback service
+                          setUseFallback(true);
                         } else {
-                          setImgError(true); // Both failed
+                          setImgError(true);
                         }
                       }}
                     />
@@ -291,51 +299,80 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
-  const radius = (size - 12) / 2;
+  const radius = (size - 16) / 2;
   const circumference = 2 * Math.PI * radius;
-  const [animatedScore, setAnimatedScore] = useState(0);
+  const ringRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const start = performance.now();
-    const duration = 1200;
-    const animate = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setAnimatedScore(Math.round(eased * score));
-      if (progress < 1) requestAnimationFrame(animate);
-    };
-    requestAnimationFrame(animate);
-  }, [score]);
+    const el = ringRef.current;
+    if (!el) return;
+
+    const circle = el.querySelector('.ring-progress') as SVGCircleElement;
+    const text = el.querySelector('.ring-text') as SVGTextElement;
+    if (!circle || !text) return;
+
+    gsap.set(circle, { strokeDashoffset: circumference });
+
+    gsap.to(circle, {
+      strokeDashoffset: circumference - (score / 100) * circumference,
+      duration: 1.5,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: el, start: 'top 85%', once: true },
+    });
+
+    const obj = { value: 0 };
+    gsap.to(obj, {
+      value: score,
+      duration: 1.5,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: el, start: 'top 85%', once: true },
+      onUpdate: () => { text.textContent = Math.round(obj.value).toString(); },
+    });
+  }, [score, circumference]);
 
   const color = score >= 70 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
-  const dashOffset = circumference - (animatedScore / 100) * circumference;
 
   return (
-    <div className="score-ring" style={{ width: size, height: size }}>
+    <div ref={ringRef} className="score-ring" style={{ width: size, height: size }}>
       <svg width={size} height={size}>
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#e5e7eb" strokeWidth="8" />
         <circle
+          className="ring-progress"
           cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth="8"
-          strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset}
-          style={{ transition: 'stroke-dashoffset 0.1s ease' }}
+          strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference}
         />
       </svg>
-      <div className="score-value" style={{ color }}>{animatedScore}</div>
+      <div className="score-value" style={{ color }}>
+        <span className="ring-text">0</span>
+      </div>
     </div>
   );
 }
 
-function ScoreBar({ label, score, color }: { label: string; score: number; color: string }) {
+function ScoreBar({ label, score, color, delay = 0 }: { label: string; score: number; color: string; delay?: number }) {
   const bgColors: Record<string, string> = {
     green: 'bg-emerald-500', orange: 'bg-orange-500', purple: 'bg-violet-500', red: 'bg-rose-500', blue: 'bg-blue-500', pink: 'bg-pink-500',
   };
+  const barRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+
+    gsap.fromTo(el, { width: '0%' }, {
+      width: `${score}%`,
+      duration: 1.2,
+      delay,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: el, start: 'top 90%', once: true },
+    });
+  }, [score, delay]);
 
   return (
     <div className="flex items-center gap-3">
       <span className="text-sm text-gray-600 w-20 shrink-0">{label}</span>
       <div className="progress-bar flex-1">
-        <div className={`progress-bar-fill ${bgColors[color] || 'bg-orange-500'}`} style={{ width: `${score}%` }} />
+        <div ref={barRef} className={`h-full rounded-full ${bgColors[color] || 'bg-orange-500'}`} style={{ width: '0%' }} />
       </div>
       <span className={`text-sm font-semibold w-10 text-right ${score >= 70 ? 'text-emerald-600' : score >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
         {score}
@@ -344,8 +381,9 @@ function ScoreBar({ label, score, color }: { label: string; score: number; color
   );
 }
 
-function CategoryCard({ title, icon, data, color }: { title: string; icon: React.ReactNode; data: CategoryData; color: string }) {
+function CategoryCard({ title, icon, data, color, index }: { title: string; icon: React.ReactNode; data: CategoryData; color: string; index: number }) {
   const [expanded, setExpanded] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const borderColors: Record<string, string> = {
     green: 'border-t-emerald-500', purple: 'border-t-violet-500', orange: 'border-t-orange-500', red: 'border-t-rose-500', blue: 'border-t-blue-500', pink: 'border-t-pink-500',
   };
@@ -353,8 +391,25 @@ function CategoryCard({ title, icon, data, color }: { title: string; icon: React
   const checks: CheckItem[] = data.checks || [];
   const suggestions = data.suggestions || [];
 
+  // Stagger reveal animation
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+
+    gsap.fromTo(el,
+      { opacity: 0, y: 50, scale: 0.97 },
+      {
+        opacity: 1, y: 0, scale: 1,
+        duration: 0.7,
+        delay: index * 0.1,
+        ease: 'power3.out',
+        scrollTrigger: { trigger: el, start: 'top 88%', once: true },
+      }
+    );
+  }, [index]);
+
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden animate-fade-in-up hover:shadow-md transition-shadow duration-200">
+    <div ref={cardRef} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden opacity-0 hover:shadow-md transition-shadow duration-200">
       <div className={`border-t-4 ${borderColors[color] || 'border-t-orange-500'} px-6 py-5`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -371,7 +426,6 @@ function CategoryCard({ title, icon, data, color }: { title: string; icon: React
       </div>
 
       <div className="px-6 pb-5">
-        {/* Check items */}
         {checks.map((check, i) => {
           const status = check.status || getStatus(check.score);
           return (
@@ -401,7 +455,6 @@ function CategoryCard({ title, icon, data, color }: { title: string; icon: React
           );
         })}
 
-        {/* Issues */}
         {data.issues && data.issues.length > 0 && (
           <div className="mt-4 pt-4 border-t border-gray-100">
             <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">发现的问题</p>
@@ -414,7 +467,6 @@ function CategoryCard({ title, icon, data, color }: { title: string; icon: React
           </div>
         )}
 
-        {/* Suggestions */}
         {suggestions.length > 0 && (
           <div className="mt-4 pt-4 border-t border-gray-100">
             <button
@@ -450,10 +502,20 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // GSAP page entrance
+  useEffect(() => {
+    if (report) {
+      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+      tl.fromTo('.report-header', { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.5 })
+        .fromTo('.overall-score', { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.6 }, '-=0.2')
+        .fromTo('.score-bar-item', { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, stagger: 0.08 }, '-=0.3')
+        .fromTo('.recommendations', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5 }, '-=0.2');
+    }
+  }, [report]);
+
   useEffect(() => {
     const fetchReport = async () => {
       try {
-        // Try localStorage first (for Vercel serverless)
         try {
           const stored = localStorage.getItem(`report_${params.id}`);
           if (stored) {
@@ -463,7 +525,6 @@ export default function ReportPage() {
           }
         } catch {}
 
-        // Fallback to API
         const response = await fetch(`/api/report/${params.id}`);
         const data = await response.json();
         if (data.success) {
@@ -516,7 +577,7 @@ export default function ReportPage() {
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA]">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100">
+      <header className="report-header sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
@@ -544,16 +605,16 @@ export default function ReportPage() {
 
       <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         {/* Overall Score */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 mb-6 text-center animate-scale-in">
+        <div className="overall-score bg-white rounded-xl border border-gray-100 shadow-sm p-8 mb-6 text-center opacity-0">
           <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-5">综合评分</p>
           <ScoreRing score={report.scores.overall} />
           <div className="mt-7 max-w-md mx-auto space-y-3.5">
-            <ScoreBar label="UI/UX" score={report.scores.uiux} color="green" />
-            <ScoreBar label="SEO" score={report.scores.seo} color="purple" />
-            <ScoreBar label="广告转化" score={report.scores.ads} color="orange" />
-            <ScoreBar label="邮件营销" score={report.scores.email} color="red" />
-            <ScoreBar label="技术性能" score={report.scores.tech} color="blue" />
-            <ScoreBar label="品牌故事" score={report.scores.brand} color="pink" />
+            <div className="score-bar-item"><ScoreBar label="UI/UX" score={report.scores.uiux} color="green" delay={0} /></div>
+            <div className="score-bar-item"><ScoreBar label="SEO" score={report.scores.seo} color="purple" delay={0.08} /></div>
+            <div className="score-bar-item"><ScoreBar label="广告转化" score={report.scores.ads} color="orange" delay={0.16} /></div>
+            <div className="score-bar-item"><ScoreBar label="邮件营销" score={report.scores.email} color="red" delay={0.24} /></div>
+            <div className="score-bar-item"><ScoreBar label="技术性能" score={report.scores.tech} color="blue" delay={0.32} /></div>
+            <div className="score-bar-item"><ScoreBar label="品牌故事" score={report.scores.brand} color="pink" delay={0.4} /></div>
           </div>
 
           {/* 评分标准说明 */}
@@ -579,7 +640,7 @@ export default function ReportPage() {
 
         {/* Recommendations */}
         {report.recommendations && report.recommendations.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6 animate-fade-in-up delay-200">
+          <div className="recommendations bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6 opacity-0">
             <h2 className="text-base font-semibold text-gray-900 mb-5 flex items-center gap-2.5">
               <span className="w-1 h-5 rounded-full bg-gradient-to-b from-orange-400 to-orange-600" />
               服务推荐
@@ -603,19 +664,20 @@ export default function ReportPage() {
 
         {/* Category Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
-          {categories.map((cat) => (
+          {categories.map((cat, i) => (
             <CategoryCard
               key={cat.key}
               title={cat.title}
               icon={cat.icon}
               data={cat.data}
               color={cat.color}
+              index={i}
             />
           ))}
         </div>
 
         {/* CTA */}
-        <div className="text-center py-10 animate-fade-in-up delay-600">
+        <div className="text-center py-10">
           <p className="text-gray-400 mb-4 text-sm">想分析其他网站？</p>
           <button onClick={() => router.push('/')} className="px-8 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold rounded-xl shadow-sm shadow-orange-200 hover:from-orange-600 hover:to-orange-700 hover:shadow-md hover:shadow-orange-200 active:scale-[0.98] transition-all duration-200 cursor-pointer">
             重新分析

@@ -21,7 +21,7 @@ function httpRequest(url, options = {}) {
       path: urlObj.pathname + urlObj.search,
       method: options.method || 'GET',
       headers: options.headers || {},
-      timeout: options.timeout || 30000
+      timeout: options.timeout || 25000
     }, (res) => {
       let data = ''
       res.on('data', chunk => data += chunk)
@@ -41,40 +41,130 @@ function httpRequest(url, options = {}) {
   })
 }
 
-// 爬取首页（极简）
+// 重试机制
+async function withRetry(fn, maxRetries = 2, delay = 1000) {
+  let lastError
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await fn()
+    } catch (e) {
+      lastError = e
+      if (i < maxRetries) {
+        console.log(`重试 ${i + 1}/${maxRetries}...`)
+        await new Promise(r => setTimeout(r, delay * (i + 1)))
+      }
+    }
+  }
+  throw lastError
+}
+
+// 爬取网页（增强版）
 async function scrapeHomepage(url) {
   try {
     const html = await httpRequest(url, {
-      timeout: 8000,
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      }
     })
 
     const title = (html.match(/<title[^>]*>([^<]+)<\/title>/i) || [])[1] || ''
     const desc = (html.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"[^>]*>/i) || [])[1] || ''
+    const h1s = []
+    const h1Matches = html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi)
+    for (const match of h1Matches) {
+      h1s.push(match[1].replace(/<[^>]*>/g, '').trim())
+    }
+    const h2s = []
+    const h2Matches = html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)
+    for (const match of h2Matches) {
+      h2s.push(match[1].replace(/<[^>]*>/g, '').trim())
+    }
+    const images = html.match(/<img[^>]*>/gi) || []
+    const hasEmailInput = /<input[^>]*type=["']?email["']?[^>]*>/i.test(html) ||
+                          /<input[^>]*name=["']?email["']?[^>]*>/i.test(html)
+    const content = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    // 提取更多SEO信息
+    const canonical = (html.match(/<link[^>]*rel="canonical"[^>]*href="([^"]*)"[^>]*>/i) || [])[1] || ''
+    const ogTitle = (html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]*)"[^>]*>/i) || [])[1] || ''
+    const ogDesc = (html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]*)"[^>]*>/i) || [])[1] || ''
+    const hasViewport = /<meta[^>]*name="viewport"[^>]*>/i.test(html)
+    const hasCharset = /<meta[^>]*charset[^>]*>/i.test(html)
+    const hasHttps = url.startsWith('https')
+
+    // 提取结构化数据
+    const hasJsonLd = /<script[^>]*type="application\/ld\+json"[^>]*>/i.test(html)
+
+    // 提取CTA按钮
+    const ctaButtons = (html.match(/<button[^>]*>[\s\S]*?<\/button>/gi) || []).length
 
     return {
       url,
-      title: title.trim().substring(0, 60),
-      desc: desc.trim().substring(0, 100),
-      content: html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 500)
+      title: title.trim().substring(0, 100),
+      desc: desc.trim().substring(0, 200),
+      h1s: h1s.slice(0, 5),
+      h2s: h2s.slice(0, 10),
+      imagesCount: images.length,
+      hasEmailInput,
+      content: content.substring(0, 2000),
+      seo: {
+        canonical,
+        ogTitle: ogTitle.substring(0, 100),
+        ogDesc: ogDesc.substring(0, 200),
+        hasViewport,
+        hasCharset,
+        hasHttps,
+        hasJsonLd,
+        ctaButtons
+      }
     }
   } catch (e) {
-    return { url, title: '', desc: '', content: '' }
+    console.error('爬取失败:', e.message)
+    return {
+      url,
+      title: '',
+      desc: '',
+      h1s: [],
+      h2s: [],
+      imagesCount: 0,
+      hasEmailInput: false,
+      content: '',
+      seo: {
+        canonical: '',
+        ogTitle: '',
+        ogDesc: '',
+        hasViewport: false,
+        hasCharset: false,
+        hasHttps: false,
+        hasJsonLd: false,
+        ctaButtons: 0
+      }
+    }
   }
 }
 
-// 调用API
-async function callAPI(prompt) {
+// 调用AI API（带重试）
+async function callAI(systemPrompt, userPrompt) {
   const url = `${MIMO_API_BASE}/chat/completions`
   const body = JSON.stringify({
     model: MIMO_MODEL,
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 1000
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
+    temperature: 0.2,
+    max_tokens: 2000
   })
 
-  console.log('调用API，请求大小:', body.length)
+  return withRetry(async () => {
+    console.log('调用API...')
 
-  try {
     const res = await httpRequest(url, {
       method: 'POST',
       headers: {
@@ -84,173 +174,346 @@ async function callAPI(prompt) {
       },
       body,
       json: true,
-      timeout: 45000
+      timeout: 20000
     })
 
-    console.log('API响应:', JSON.stringify(res).substring(0, 200))
+    console.log('API响应收到')
 
     if (!res || !res.choices || !res.choices[0]) {
-      console.error('API响应格式错误')
-      return null
+      console.error('API响应格式错误:', JSON.stringify(res).substring(0, 200))
+      throw new Error('API响应格式错误')
     }
 
-    // 优先使用content，如果为空则使用reasoning_content
-    const content = res.choices[0].message.content || res.choices[0].message.reasoning_content || ''
-    console.log('AI返回content:', res.choices[0].message.content?.substring(0, 100))
-    console.log('AI返回reasoning:', res.choices[0].message.reasoning_content?.substring(0, 100))
-    console.log('最终使用:', content.substring(0, 150))
+    const content = res.choices[0].message.content || ''
+    const reasoning = res.choices[0].message.reasoning_content || ''
 
-    if (!content) {
-      console.error('AI返回空内容')
-      return null
+    console.log('content长度:', content.length)
+    console.log('reasoning长度:', reasoning.length)
+
+    const finalContent = content || reasoning
+
+    if (!finalContent) {
+      throw new Error('AI返回空内容')
     }
 
-    // 提取JSON（支持 ```json ... ``` 格式，也支持直接JSON）
-    let jsonStr = ''
+    return finalContent
+  })
+}
 
-    // 先尝试从content中提取
-    const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/)
-    if (codeBlockMatch) {
-      jsonStr = codeBlockMatch[1].trim()
-      console.log('从代码块提取JSON')
-    } else {
-      // 尝试匹配完整的JSON对象（支持嵌套）
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        jsonStr = jsonMatch[0]
-        console.log('直接提取JSON')
-      }
+// 解析AI响应
+function parseAIResponse(raw) {
+  if (!raw) return null
+
+  let jsonStr = ''
+
+  const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (codeBlockMatch) {
+    jsonStr = codeBlockMatch[1].trim()
+  } else {
+    const jsonMatch = raw.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      jsonStr = jsonMatch[0]
     }
+  }
 
-    // 如果content中没有找到JSON，尝试从reasoning_content中提取
-    if (!jsonStr && res.choices[0].message.reasoning_content) {
-      const reasoning = res.choices[0].message.reasoning_content
-      const reasoningJsonMatch = reasoning.match(/\{[\s\S]*\}/)
-      if (reasoningJsonMatch) {
-        jsonStr = reasoningJsonMatch[0]
-        console.log('从reasoning_content提取JSON')
-      }
-    }
+  console.log('提取的JSON:', jsonStr.substring(0, 200))
 
-    console.log('提取的JSON:', jsonStr.substring(0, 150))
+  if (!jsonStr || !jsonStr.includes('{')) {
+    console.error('未找到JSON')
+    return null
+  }
 
-    if (!jsonStr || !jsonStr.includes('{')) {
-      console.error('未找到JSON，原始内容:', content.substring(0, 100))
-      return null
-    }
-
-    try {
-      const result = JSON.parse(jsonStr.replace(/,\s*([\]}])/g, '$1'))
-      console.log('解析成功:', result.score)
-      return result
-    } catch (e) {
-      console.error('JSON解析失败:', e.message, '内容:', jsonStr.substring(0, 150))
-      return null
-    }
+  try {
+    const fixedJson = jsonStr.replace(/,\s*([\]}])/g, '$1')
+    const result = JSON.parse(fixedJson)
+    console.log('解析成功')
+    return result
   } catch (e) {
-    console.error('API调用失败:', e.message)
+    console.error('JSON解析失败:', e.message)
     return null
   }
 }
 
-// 分析函数（并行调用2个维度）
-async function analyze(data) {
-  const s = `网站：${data.url}\n标题：${data.title}\n描述：${data.desc}\n内容：${data.content}`
+// 串行分析函数（避免超时）
+async function analyzeSequentially(url, data) {
+  const results = {}
 
-  const prompts = {
-    uiux: `UI/UX专家评分0-100。${s}\n返回JSON:{"score":0,"summary":"","checks":[{"label":"","score":0,"feedback":""}],"issues":[],"suggestions":[]}`,
-    seo: `SEO专家评分0-100。${s}\n返回JSON:{"score":0,"summary":"","checks":[{"label":"","score":0,"feedback":""}],"issues":[],"suggestions":[]}`,
-    ads: `广告专家评分0-100。${s}\n返回JSON:{"score":0,"summary":"","checks":[{"label":"","score":0,"feedback":""}],"issues":[],"suggestions":[]}`,
-    email: `邮件专家评分0-100。${s}\n返回JSON:{"score":0,"summary":"","checks":[{"label":"","score":0,"feedback":""}],"issues":[],"suggestions":[]}`
+  // 1. UI/UX分析
+  console.log('开始UI/UX分析...')
+  const uiuxPrompt = `你是一个UI/UX设计专家。分析这个网站的用户体验设计。
+
+网站信息：
+- URL: ${url}
+- 标题: ${data.title}
+- 描述: ${data.desc}
+- H1标签: ${data.h1s.join(', ')}
+- H2标签: ${data.h2s.slice(0, 5).join(', ')}
+- 图片数量: ${data.imagesCount}
+- 内容预览: ${data.content.substring(0, 500)}
+
+请返回JSON格式：
+{
+  "score": 0-100的分数,
+  "summary": "整体评价",
+  "checks": [
+    {
+      "label": "检查项名称",
+      "score": 0-100,
+      "feedback": "具体反馈",
+      "suggestion": "改进建议"
+    }
+  ],
+  "issues": ["问题1", "问题2"],
+  "suggestions": ["建议1", "建议2"]
+}`
+
+  try {
+    const uiuxRaw = await callAI('你是UI/UX设计专家', uiuxPrompt)
+    results.uiux = parseAIResponse(uiuxRaw) || {
+      score: 60,
+      summary: '分析失败，使用默认分数',
+      checks: [],
+      issues: ['无法完成分析'],
+      suggestions: ['请稍后重试']
+    }
+  } catch (e) {
+    console.error('UI/UX分析失败:', e.message)
+    results.uiux = {
+      score: 60,
+      summary: '分析失败，使用默认分数',
+      checks: [],
+      issues: ['无法完成分析'],
+      suggestions: ['请稍后重试']
+    }
   }
 
-  // 并行调用2个维度
-  console.log('并行分析 uiux 和 seo...')
-  const [uiux, seo] = await Promise.all([
-    callAPI(prompts.uiux).then(r => r || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }),
-    callAPI(prompts.seo).then(r => r || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] })
-  ])
-  console.log('uiux seo 完成:', uiux.score, seo.score)
+  // 2. SEO分析
+  console.log('开始SEO分析...')
+  const seoPrompt = `你是一个SEO专家。分析这个网站的搜索引擎优化。
 
-  console.log('并行分析 ads 和 email...')
-  const [ads, email] = await Promise.all([
-    callAPI(prompts.ads).then(r => r || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }),
-    callAPI(prompts.email).then(r => r || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] })
-  ])
-  console.log('ads email 完成:', ads.score, email.score)
+网站信息：
+- URL: ${url}
+- 标题: ${data.title}
+- 描述: ${data.desc}
+- H1标签: ${data.h1s.join(', ')}
+- H2标签: ${data.h2s.slice(0, 5).join(', ')}
+- Canonical: ${data.seo.canonical}
+- OG标题: ${data.seo.ogTitle}
+- OG描述: ${data.seo.ogDesc}
+- Viewport: ${data.seo.hasViewport}
+- Charset: ${data.seo.hasCharset}
+- HTTPS: ${data.seo.hasHttps}
+- JSON-LD: ${data.seo.hasJsonLd}
 
-  return { uiux, seo, ads, email }
+请返回JSON格式：
+{
+  "score": 0-100的分数,
+  "summary": "整体评价",
+  "checks": [
+    {
+      "label": "检查项名称",
+      "score": 0-100,
+      "feedback": "具体反馈",
+      "suggestion": "改进建议"
+    }
+  ],
+  "issues": ["问题1", "问题2"],
+  "suggestions": ["建议1", "建议2"]
+}`
+
+  try {
+    const seoRaw = await callAI('你是SEO专家', seoPrompt)
+    results.seo = parseAIResponse(seoRaw) || {
+      score: 60,
+      summary: '分析失败，使用默认分数',
+      checks: [],
+      issues: ['无法完成分析'],
+      suggestions: ['请稍后重试']
+    }
+  } catch (e) {
+    console.error('SEO分析失败:', e.message)
+    results.seo = {
+      score: 60,
+      summary: '分析失败，使用默认分数',
+      checks: [],
+      issues: ['无法完成分析'],
+      suggestions: ['请稍后重试']
+    }
+  }
+
+  // 3. 广告转化分析
+  console.log('开始广告转化分析...')
+  const adsPrompt = `你是一个转化率优化（CRO）专家。分析这个网站的广告转化能力。
+
+网站信息：
+- URL: ${url}
+- 标题: ${data.title}
+- 描述: ${data.desc}
+- CTA按钮数量: ${data.seo.ctaButtons}
+- 内容预览: ${data.content.substring(0, 500)}
+
+请返回JSON格式：
+{
+  "score": 0-100的分数,
+  "summary": "整体评价",
+  "checks": [
+    {
+      "label": "检查项名称",
+      "score": 0-100,
+      "feedback": "具体反馈",
+      "suggestion": "改进建议"
+    }
+  ],
+  "issues": ["问题1", "问题2"],
+  "suggestions": ["建议1", "建议2"]
+}`
+
+  try {
+    const adsRaw = await callAI('你是CRO专家', adsPrompt)
+    results.ads = parseAIResponse(adsRaw) || {
+      score: 60,
+      summary: '分析失败，使用默认分数',
+      checks: [],
+      issues: ['无法完成分析'],
+      suggestions: ['请稍后重试']
+    }
+  } catch (e) {
+    console.error('广告转化分析失败:', e.message)
+    results.ads = {
+      score: 60,
+      summary: '分析失败，使用默认分数',
+      checks: [],
+      issues: ['无法完成分析'],
+      suggestions: ['请稍后重试']
+    }
+  }
+
+  // 4. 邮件营销分析
+  console.log('开始邮件营销分析...')
+  const emailPrompt = `你是一个邮件营销专家。分析这个网站的邮件营销策略。
+
+网站信息：
+- URL: ${url}
+- 标题: ${data.title}
+- 有邮箱输入框: ${data.hasEmailInput}
+- 内容预览: ${data.content.substring(0, 500)}
+
+请返回JSON格式：
+{
+  "score": 0-100的分数,
+  "summary": "整体评价",
+  "checks": [
+    {
+      "label": "检查项名称",
+      "score": 0-100,
+      "feedback": "具体反馈",
+      "suggestion": "改进建议"
+    }
+  ],
+  "issues": ["问题1", "问题2"],
+  "suggestions": ["建议1", "建议2"]
+}`
+
+  try {
+    const emailRaw = await callAI('你是邮件营销专家', emailPrompt)
+    results.email = parseAIResponse(emailRaw) || {
+      score: 60,
+      summary: '分析失败，使用默认分数',
+      checks: [],
+      issues: ['无法完成分析'],
+      suggestions: ['请稍后重试']
+    }
+  } catch (e) {
+    console.error('邮件营销分析失败:', e.message)
+    results.email = {
+      score: 60,
+      summary: '分析失败，使用默认分数',
+      checks: [],
+      issues: ['无法完成分析'],
+      suggestions: ['请稍后重试']
+    }
+  }
+
+  return results
 }
 
 // 主函数
 exports.main = async (event, context) => {
   const { url, test } = event
 
+  console.log('云函数被调用，参数:', { url, test })
+
   // 测试模式
   if (test) {
-    console.log('测试API...')
+    console.log('测试模式')
     try {
-      const result = await callAPI('你好，返回JSON:{"status":"ok"}')
-      console.log('测试结果:', result)
-      return { success: true, result }
+      const result = await callAI('你是一个助手', '返回JSON:{"status":"ok"}')
+      const parsed = parseAIResponse(result)
+      console.log('测试结果:', parsed)
+      return { success: true, result: parsed }
     } catch (e) {
       console.error('测试失败:', e)
       return { success: false, error: e.message }
     }
   }
 
-  if (!url) return { success: false, error: '请提供网址' }
+  if (!url) {
+    console.log('未提供URL')
+    return { success: false, error: '请提供网址' }
+  }
 
   context.callbackWaitsForEmptyEventLoop = false
 
   try {
-    console.log('爬取...')
+    console.log('开始爬取:', url)
     const data = await scrapeHomepage(url)
     console.log('爬取完成:', data.title)
 
-    const s = `${data.url} ${data.title} ${data.content.substring(0, 200)}`
+    // 串行调用AI分析（避免超时）
+    console.log('开始AI分析（串行模式）...')
+    const analysis = await analyzeSequentially(url, data)
+    console.log('AI分析完成')
 
-    // 一次调用返回4个维度
-    console.log('分析中...')
-    const prompt = `你是网站分析专家。根据以下信息，直接返回JSON格式评分，不要任何其他文字。
+    // 计算总分
+    const overall = Math.round(
+      (analysis.uiux.score + analysis.seo.score + analysis.ads.score + analysis.email.score) / 4
+    )
 
-网站：${data.url}
-标题：${data.title}
-内容：${data.content.substring(0, 150)}
-
-直接返回这个JSON，不要markdown，不要解释：
-{"uiux":{"score":80,"summary":"好","checks":[],"issues":[]},"seo":{"score":70,"summary":"一般","checks":[],"issues":[]},"ads":{"score":60,"summary":"待改进","checks":[],"issues":[]},"email":{"score":50,"summary":"差","checks":[],"issues":[]}}`
-
-    const result = await callAPI(prompt)
-    console.log('分析完成')
-
-    const uiux = result?.uiux || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }
-    const seo = result?.seo || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }
-    const ads = result?.ads || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }
-    const email = result?.email || { score: 50, summary: '分析失败', checks: [], issues: [], suggestions: [] }
-
-    const overall = Math.round((uiux.score + seo.score + ads.score + email.score) / 4)
-
+    console.log('写入数据库...')
     const db = cloud.database()
     const dbResult = await db.collection('reports').add({
       data: {
         url,
         timestamp: db.serverDate(),
-        scores: { uiux: uiux.score, seo: seo.score, ads: ads.score, email: email.score, overall },
-        analysis: { uiux, seo, ads, email },
-        pages: []
+        scores: {
+          uiux: analysis.uiux.score,
+          seo: analysis.seo.score,
+          ads: analysis.ads.score,
+          email: analysis.email.score,
+          overall
+        },
+        analysis,
+        pages: [{ type: 'homepage', title: data.title, url }]
       }
     })
+    console.log('数据库写入成功，ID:', dbResult._id)
 
     return {
       success: true,
       reportId: dbResult._id,
-      scores: { uiux: uiux.score, seo: seo.score, ads: ads.score, email: email.score, overall },
-      analysis: { uiux, seo, ads, email },
-      pages: []
+      scores: {
+        uiux: analysis.uiux.score,
+        seo: analysis.seo.score,
+        ads: analysis.ads.score,
+        email: analysis.email.score,
+        overall
+      },
+      analysis,
+      pages: [{ type: 'homepage', title: data.title, url }]
     }
   } catch (e) {
-    console.error('失败:', e)
+    console.error('失败:', e.message)
+    console.error('错误堆栈:', e.stack)
     return { success: false, error: e.message }
   }
 }

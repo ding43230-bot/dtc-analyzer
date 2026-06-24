@@ -46,78 +46,9 @@ body {
   border-radius: 4px;
 }
 
-/* Animations */
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(30px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes progressFill {
-  from { width: 0; }
-}
-
-@keyframes donutFill {
-  from { stroke-dashoffset: 113; }
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+/* GSAP-compatible base states (hidden until animated) */
+.gsap-hidden {
   opacity: 0;
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.5s ease forwards;
-  opacity: 0;
-}
-
-.animate-scale-in {
-  animation: scaleIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  opacity: 0;
-}
-
-.animate-slide-in-right {
-  animation: slideInRight 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  opacity: 0;
-}
-
-.animate-slide-down {
-  animation: fadeInUp 0.3s ease forwards;
-}
-
-.delay-100 { animation-delay: 0.1s; }
-.delay-200 { animation-delay: 0.2s; }
-.delay-300 { animation-delay: 0.3s; }
-.delay-400 { animation-delay: 0.4s; }
-.delay-500 { animation-delay: 0.5s; }
-
-/* Progress bar */
-.progress-bar {
-  height: 6px;
-  border-radius: 3px;
-  background: #E5E7EB;
-  overflow: hidden;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
-  animation: progressFill 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* Score ring */
@@ -138,15 +69,27 @@ body {
   font-weight: 800;
 }
 
-/* Donut animation */
+/* Donut animation (CSS fallback for GSAP) */
 .donut-animate {
   animation: donutFill 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes donutFill {
+  from { stroke-dashoffset: 113; }
+}
+
+/* Progress bar */
+.progress-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: #E5E7EB;
+  overflow: hidden;
 }
 
 /* Dashboard 3D card */
 .dashboard-card {
   transform: perspective(1100px) rotateY(-5deg) rotateX(2deg);
-  transition: transform 0.35s ease, box-shadow 0.35s ease;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .dashboard-card:hover {
@@ -154,13 +97,13 @@ body {
   box-shadow: 0 40px 80px rgba(0,0,0,0.22);
 }
 
-/* Touch targets - minimum 44x44px (UI/UX Pro Max guideline) */
+/* Touch targets */
 button, a, [role="button"] {
   min-height: 44px;
   min-width: 44px;
 }
 
-/* Typography improvements */
+/* Typography */
 h1, h2, h3, h4, h5, h6 {
   line-height: 1.2;
   letter-spacing: -0.02em;
@@ -168,7 +111,7 @@ h1, h2, h3, h4, h5, h6 {
 
 p {
   line-height: 1.7;
-  max-width: 65ch; /* Optimal reading width */
+  max-width: 65ch;
 }
 
 /* Smooth transitions for interactive elements */
@@ -208,4 +151,59 @@ a, button, input, select, textarea {
 ::selection {
   background: rgba(249, 115, 22, 0.2);
   color: var(--dark);
+}
+
+/* Hero underline animation */
+.hero-underline {
+  stroke-dasharray: 200;
+  stroke-dashoffset: 200;
+  animation: drawLine 1.2s ease forwards 0.8s;
+}
+
+@keyframes drawLine {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Slide down animation for expandable content */
+.animate-slide-down {
+  animation: slideDown 0.3s ease forwards;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Scale in for error/empty states */
+.animate-scale-in {
+  animation: scaleIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Fade in for loading states */
+.animate-fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Floating orb animations */
+.seo-orb-1, .seo-orb-2 {
+  animation: floatOrb 6s ease-in-out infinite;
+}
+
+.seo-orb-2 {
+  animation-delay: -3s;
+}
+
+@keyframes floatOrb {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(15px, -20px); }
 }

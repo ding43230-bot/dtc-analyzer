@@ -75,7 +75,8 @@ Page({
       },
       fail: (err) => {
         console.error('调用失败:', err)
-        this.showError('网络错误，请重试')
+        console.error('错误详情:', JSON.stringify(err))
+        this.showError('云函数调用失败: ' + (err.errMsg || err.message || '未知错误'))
       },
       complete: () => {
         setTimeout(() => {

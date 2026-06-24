@@ -4,30 +4,38 @@ export async function POST(request: NextRequest) {
   try {
     const { messages, temperature = 0.2, max_tokens = 2500 } = await request.json();
 
-    const apiBase = process.env.MIMO_API_BASE;
-    const apiKey = process.env.MIMO_API_KEY;
-    const model = process.env.MIMO_MODEL || 'mimo-v2.5-pro';
+    const apiBase = process.env.NEXT_PUBLIC_MIMO_API_BASE;
+    const apiKey = process.env.NEXT_PUBLIC_MIMO_API_KEY;
+    const model = process.env.NEXT_PUBLIC_MIMO_MODEL || 'mimo-v2.5-pro';
 
     if (!apiBase || !apiKey) {
       return NextResponse.json({ error: 'API not configured', hasBase: !!apiBase, hasKey: !!apiKey }, { status: 500 });
     }
 
+    // Extract system message (Anthropic format)
+    const systemMsg = messages.find((m: any) => m.role === 'system')?.content || '';
+    const userMsgs = messages.filter((m: any) => m.role !== 'system').map((m: any) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
 
     let response: Response;
     try {
-      response = await fetch(`${apiBase}/chat/completions`, {
+      response = await fetch(`${apiBase}/v1/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
           model,
-          messages,
-          temperature,
           max_tokens,
+          system: systemMsg,
+          messages: userMsgs,
         }),
         signal: controller.signal,
       });
@@ -43,7 +51,12 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    // Convert Anthropic response to OpenAI-compatible format for backward compatibility
+    const textBlock = data.content?.find((b: any) => b.type === 'text');
+    const content = textBlock?.text || '';
+    return NextResponse.json({
+      choices: [{ message: { content } }],
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message, stack: error?.stack?.substring(0, 200) }, { status: 500 });
   }
