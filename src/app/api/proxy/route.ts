@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, temperature = 0.2, max_tokens = 2500 } = await request.json();
+    const { messages, temperature = 0.2, max_tokens = 8000 } = await request.json();
 
     const apiBase = process.env.NEXT_PUBLIC_MIMO_API_BASE;
     const apiKey = process.env.NEXT_PUBLIC_MIMO_API_KEY;
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
           max_tokens,
           system: systemMsg,
           messages: userMsgs,
+          thinking: { type: 'disabled' },
         }),
         signal: controller.signal,
       });
@@ -53,7 +54,9 @@ export async function POST(request: NextRequest) {
     const data = await response.json();
     // Convert Anthropic response to OpenAI-compatible format for backward compatibility
     const textBlock = data.content?.find((b: any) => b.type === 'text');
-    const content = textBlock?.text || '';
+    const thinkingBlock = data.content?.find((b: any) => b.type === 'thinking');
+    // 优先用 text，如果没有则用 thinking（MiMo 有时只返回 thinking）
+    const content = textBlock?.text || thinkingBlock?.thinking || '';
     return NextResponse.json({
       choices: [{ message: { content } }],
     });

@@ -122,42 +122,34 @@ H2/H3: ${p.headings || '无'}
 
 async function callProxy(messages: Array<{role: string; content: string}>): Promise<string> {
   try {
-    const apiBase = process.env.NEXT_PUBLIC_MIMO_API_BASE;
-    const apiKey = process.env.NEXT_PUBLIC_MIMO_API_KEY;
-    const model = process.env.NEXT_PUBLIC_MIMO_MODEL || 'mimo-v2.5-pro';
-
-    // Extract system message and user messages (Anthropic format)
-    const systemMsg = messages.find(m => m.role === 'system')?.content || '';
-    const userMsgs = messages.filter(m => m.role !== 'system').map(m => ({
-      role: m.role,
-      content: m.content,
-    }));
-
-    const res = await fetch(`${apiBase}/v1/messages`, {
+    // 走服务端代理，避免 CORS 问题
+    const res = await fetch('/api/proxy', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey || '',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 8000,
-        system: systemMsg,
-        messages: userMsgs,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, max_tokens: 8000 }),
     });
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      console.error('MiMo API error:', res.status, errText.substring(0, 200));
+      console.error('Proxy error:', res.status, errText.substring(0, 300));
       return '';
     }
 
     const data = await res.json();
-    // Anthropic format: content is an array of blocks
-    const textBlock = data.content?.find((b: any) => b.type === 'text');
-    return textBlock?.text || '';
+
+    // 代理返回 OpenAI 兼容格式
+    if (data.choices?.[0]?.message?.content) {
+      return data.choices[0].message.content;
+    }
+
+    // 兼容 Anthropic 原始格式
+    if (data.content) {
+      const textBlock = data.content.find((b: any) => b.type === 'text');
+      return textBlock?.text || '';
+    }
+
+    console.error('Unexpected response format:', JSON.stringify(data).substring(0, 300));
+    return '';
   } catch (e: any) {
     console.error('API call failed:', e?.message);
     return '';
@@ -296,7 +288,7 @@ async function analyzeCategory(systemPrompt: string, userPrompt: string): Promis
 export async function runClientAnalysis(data: ScrapedData, pages?: PageSummary[]): Promise<FullAIAnalysis> {
   const summary = buildScrapedDataSummary(data, pages);
 
-  const JSON_FORMAT = `直接返回JSON，不要推理过程，不要代码块标记。格式: {"score":0-100,"summary":"综合评语(50-100字)","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}`;
+  const JSON_FORMAT = `【重要】不要使用thinking/思考模式，直接输出最终JSON结果。不要代码块标记。格式: {"score":0-100,"summary":"综合评语(50-100字)","checks":[{"label":"","score":0-100,"feedback":"","suggestion":"","evidence":{"pageUrl":"","location":"","selector":""}}],"issues":[],"suggestions":[]}`;
   const ANALYSIS_RULES = `你正在分析的数据包含首页和多个子页面（产品页、集合页、关于页等），请综合所有页面给出分析，不要只看首页。根据网站实际情况如实评估，发现了几个问题就写几个checks，有几条建议就写几条suggestions，不要凑数也不要遗漏。`;
 
   const [uiux, seo, ads, email, tech, brand] = await Promise.all([
